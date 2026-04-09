@@ -1,0 +1,188 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                   INÍCIO RÁPIDO - MODIFICAR PARÂMETROS                       ║
+║                                                                              ║
+║                    3 PASSOS PARA MUDAR O Q-LEARNING                         ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+
+PASSO 1: ABRIR O ARQUIVO
+═════════════════════════════════════════════════════════════════════════════
+
+Escolha UM dos comandos abaixo:
+
+  nano qlearning_sequential.c    (mais fácil - tecle Ctrl+X para salvar)
+  
+  gedit qlearning_sequential.c   (interface gráfica)
+  
+  vim qlearning_sequential.c     (avançado - tecle :wq para salvar)
+
+
+PASSO 2: ENCONTRAR OS PARÂMETROS
+═════════════════════════════════════════════════════════════════════════════
+
+Vá para a linha 60 (pressione Ctrl+G no nano ou gedit)
+
+Você vai ver:
+
+    60: #define GRID_ROWS 4      ← TAMANHO GRID (LINHAS)
+    61: #define GRID_COLS 4      ← TAMANHO GRID (COLUNAS)
+    62: #define NUM_STATES (GRID_ROWS * GRID_COLS)
+    ...
+    72: #define ALPHA 0.1        ← VELOCIDADE APRENDIZADO
+    73: #define GAMMA 0.9        ← IMPORTÂNCIA DO FUTURO
+    74: #define EPSILON 0.1      ← EXPLORAÇÃO (%)
+    75: #define NUM_EPISODES 1000 ← EPISÓDIOS TREINAMENTO
+    76: #define MAX_STEPS 100    ← LIMITE DE PASSOS
+    ...
+    84: #define REWARD_GOAL 100.0      ← MOTIVAÇÃO
+    85: #define REWARD_OBSTACLE -100.0 ← PUNIÇÃO OBSTÁCULO
+    86: #define REWARD_STEP -1.0       ← PENALIDADE POR PASSO
+
+    80: #define GOAL_STATE 15     ← RECALCULAR SE MUDAR GRID
+    81: #define OBSTACLE_STATE 5  ← RECALCULAR SE MUDAR GRID
+
+
+PASSO 3: MUDAR VALORES
+═════════════════════════════════════════════════════════════════════════════
+
+Escolha UMA das 4 RECEITAS abaixo e copie os valores:
+
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ RECEITA 1: TESTE RÁPIDO (1 segundo)                                     │
+├─────────────────────────────────────────────────────────────────────────┤
+│ #define GRID_ROWS 3                                                     │
+│ #define GRID_COLS 3                                                     │
+│ #define ALPHA 0.2                                                       │
+│ #define GAMMA 0.8                                                       │
+│ #define EPSILON 0.15                                                    │
+│ #define NUM_EPISODES 300                                                │
+│ #define MAX_STEPS 50                                                    │
+│ #define GOAL_STATE 8                                                    │
+│ #define OBSTACLE_STATE 4                                                │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ RECEITA 2: PADRÃO ROBUSTO (5 segundos) ← RECOMENDADO!                 │
+├─────────────────────────────────────────────────────────────────────────┤
+│ #define GRID_ROWS 4                                                     │
+│ #define GRID_COLS 4                                                     │
+│ #define ALPHA 0.1                                                       │
+│ #define GAMMA 0.9                                                       │
+│ #define EPSILON 0.1                                                     │
+│ #define NUM_EPISODES 1000                                               │
+│ #define MAX_STEPS 100                                                   │
+│ #define GOAL_STATE 15                                                   │
+│ #define OBSTACLE_STATE 5                                                │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ RECEITA 3: GRID GRANDE (30 segundos)                                    │
+├─────────────────────────────────────────────────────────────────────────┤
+│ #define GRID_ROWS 8                                                     │
+│ #define GRID_COLS 8                                                     │
+│ #define ALPHA 0.08                                                      │
+│ #define GAMMA 0.92                                                      │
+│ #define EPSILON 0.08                                                    │
+│ #define NUM_EPISODES 3000                                               │
+│ #define MAX_STEPS 200                                                   │
+│ #define GOAL_STATE 63                                                   │
+│ #define OBSTACLE_STATE 9                                                │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ RECEITA 4: APRENDIZADO RÁPIDO (2 segundos)                             │
+├─────────────────────────────────────────────────────────────────────────┤
+│ #define GRID_ROWS 4                                                     │
+│ #define GRID_COLS 4                                                     │
+│ #define ALPHA 0.3         ← RÁPIDO!                                     │
+│ #define GAMMA 0.95                                                      │
+│ #define EPSILON 0.05                                                    │
+│ #define NUM_EPISODES 500                                                │
+│ #define MAX_STEPS 100                                                   │
+│ #define GOAL_STATE 15                                                   │
+│ #define OBSTACLE_STATE 5                                                │
+└─────────────────────────────────────────────────────────────────────────┘
+
+
+COMPILAR E TESTAR
+═════════════════════════════════════════════════════════════════════════════
+
+Depois de salvar as mudanças, abra um terminal e execute:
+
+$ cd /home/rayan/graduation/estudos/parallel/OpenMP
+$ make clean
+$ make all
+$ make run
+
+Resultado esperado:
+  ✓ Compilação sem erros
+  ✓ Programa executa
+  ✓ "Agente encontrou o caminho em X passos."
+
+
+VALIDAR COM TESTES
+═════════════════════════════════════════════════════════════════════════════
+
+Para garantir que tudo funciona:
+
+$ make test
+
+Resultado esperado:
+  ✓ TODOS OS TESTES PASSARAM! (44/44)
+
+
+MUDAR APENAS 1 PARÂMETRO
+═════════════════════════════════════════════════════════════════════════════
+
+Se preferir mudar apenas um valor (sem receita), use sed:
+
+# Aumentar ALPHA (mais rápido)
+sed -i 's/#define ALPHA 0.1/#define ALPHA 0.2/' qlearning_sequential.c
+
+# Diminuir NUM_EPISODES (teste mais rápido)
+sed -i 's/#define NUM_EPISODES 1000/#define NUM_EPISODES 300/' qlearning_sequential.c
+
+# Mudar tamanho do grid para 5×5
+sed -i 's/#define GRID_ROWS 4/#define GRID_ROWS 5/' qlearning_sequential.c
+sed -i 's/#define GRID_COLS 4/#define GRID_COLS 5/' qlearning_sequential.c
+sed -i 's/#define GOAL_STATE 15/#define GOAL_STATE 24/' qlearning_sequential.c
+sed -i 's/#define OBSTACLE_STATE 5/#define OBSTACLE_STATE 6/' qlearning_sequential.c
+
+make clean && make all && make run
+
+
+9 PARÂMETROS E SEUS EFEITOS
+═════════════════════════════════════════════════════════════════════════════
+
+┌─────────────────────┬────────────┬──────────────┬──────────────────┐
+│ Parâmetro           │ Padrão     │ Aumentar     │ Diminuir         │
+├─────────────────────┼────────────┼──────────────┼──────────────────┤
+│ GRID_ROWS/COLS      │ 4          │ Problema +   │ Problema -       │
+│ ALPHA               │ 0.1        │ Rápido       │ Lento            │
+│ GAMMA               │ 0.9        │ Futuro +     │ Futuro -         │
+│ EPSILON             │ 0.1        │ Exploração+  │ Exploração-      │
+│ NUM_EPISODES        │ 1000       │ Converge +   │ Teste rápido     │
+│ MAX_STEPS           │ 100        │ Caminho +    │ Caminho -        │
+│ REWARD_GOAL         │ 100.0      │ Motivação +  │ Motivação -      │
+│ REWARD_OBSTACLE     │ -100.0     │ Punição +    │ Punição -        │
+│ REWARD_STEP         │ -1.0       │ Curto +      │ Curto -          │
+└─────────────────────┴────────────┴──────────────┴──────────────────┘
+
+
+DÚVIDAS?
+═════════════════════════════════════════════════════════════════════════════
+
+Leia os outros arquivos:
+
+  README_PARAMETROS.md  → Guia rápido em Markdown
+  PARAMETROS.org        → Guia detalhado em Org Mode
+  RELATORIO.org         → Relatório técnico completo
+  qlearning_sequential.c → Código com 600+ comentários
+
+
+═════════════════════════════════════════════════════════════════════════════
+
+DICA: Comece com RECEITA 2 (Padrão Robusto) e depois experimente!
+
+═════════════════════════════════════════════════════════════════════════════

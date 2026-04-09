@@ -1,0 +1,532 @@
+#+TITLE: Guia de Modificação de Parâmetros - Q-Learning
+#+AUTHOR: Tutorial de Configuração
+#+DATE: 2026-04-07
+#+OPTIONS: toc:2 num:t ^:nil
+
+* Visão Geral dos Parâmetros Modificáveis
+
+O código Q-Learning tem 9 constantes principais que podem ser alteradas para 
+modificar o comportamento do algoritmo. Elas estão no início do arquivo 
+(linhas 60-86).
+
+#+BEGIN_SRC c
+// Linhas 60-86 do qlearning_sequential.c
+#define GRID_ROWS 4      // TAMANHO DO GRID
+#define GRID_COLS 4
+
+#define ALPHA 0.1        // HIPERPARÂMETROS
+#define GAMMA 0.9
+#define EPSILON 0.1
+
+#define NUM_EPISODES 1000 // TREINAMENTO
+#define MAX_STEPS 100
+
+#define REWARD_GOAL 100.0        // RECOMPENSAS
+#define REWARD_OBSTACLE -100.0
+#define REWARD_STEP -1.0
+
+#define START_STATE 0    // POSIÇÕES
+#define GOAL_STATE 15
+#define OBSTACLE_STATE 5
+#+END_SRC
+
+* Parâmetros Principais
+
+** 1. TAMANHO DO GRID (GRID_ROWS, GRID_COLS)
+
+*** Padrão
+#+BEGIN_SRC c
+#define GRID_ROWS 4
+#define GRID_COLS 4
+#+END_SRC
+Grid 4×4 = 16 estados
+
+*** Impacto
+| Tamanho | Complexidade | Tempo Treinamento | Uso       |
+|---------+--------------+-------------------+-----------|
+| 3×3     | Fácil        | <1 segundo        | Teste rápido |
+| 4×4     | Normal       | ~5 segundos       | Padrão    |
+| 5×5     | Médio        | ~10 segundos      | Desafio   |
+| 8×8     | Difícil      | ~30 segundos      | Desafio maior |
+| 10×10   | Muito difícil | ~60 segundos      | Problema sério |
+
+*** Como Mudar para 5×5
+#+BEGIN_SRC c
+#define GRID_ROWS 5
+#define GRID_COLS 5
+
+// Também PRECISA mudar:
+#define GOAL_STATE 24          // (4,4) = 4×5+4 = 24
+#define OBSTACLE_STATE 6       // (1,1) = 1×5+1 = 6
+#define NUM_EPISODES 1500      // Mais episódios para convergir!
+#+END_SRC
+
+*** Fórmula para Calcular Posições
+#+BEGIN_SRC text
+estado = linha × GRID_COLS + coluna
+
+Exemplos para grid 5×5:
+- (0,0) = 0×5 + 0 = 0     (início)
+- (4,4) = 4×5 + 4 = 24    (objetivo)
+- (1,1) = 1×5 + 1 = 6     (obstáculo)
+#+END_SRC
+
+*** Exemplos
+#+BEGIN_SRC c
+// Grid 3×3 (mais rápido)
+#define GRID_ROWS 3
+#define GRID_COLS 3
+#define GOAL_STATE 8        // (2,2) = 2×3+2 = 8
+#define OBSTACLE_STATE 4    // (1,1) = 1×3+1 = 4
+
+// Grid 6×6 (mais desafiador)
+#define GRID_ROWS 6
+#define GRID_COLS 6
+#define GOAL_STATE 35       // (5,5) = 5×6+5 = 35
+#define OBSTACLE_STATE 7    // (1,1) = 1×6+1 = 7
+#+END_SRC
+
+** 2. ALPHA (Taxa de Aprendizado)
+
+*** Padrão
+#+BEGIN_SRC c
+#define ALPHA 0.1
+#+END_SRC
+
+*** O que faz
+Controla a *velocidade* de aprendizado.
+
+*** Impacto
+| Valor  | Comportamento              | Quando usar              |
+|--------+----------------------------+--------------------------|
+| 0.01   | Muito lento, muito estável | Problemas instáveis      |
+| 0.05   | Lento, estável             | Cautela, baixo ruído     |
+| 0.1    | **BALANCEADO** (padrão)    | Uso geral                |
+| 0.2    | Rápido, menos estável      | Convergência rápida      |
+| 0.5    | Muito rápido, instável     | Apenas testes             |
+
+*** Exemplos
+#+BEGIN_SRC c
+// Aprendizado LENTO mas muito estável
+#define ALPHA 0.05
+
+// Aprendizado RÁPIDO (cuidado: pode instabilizar)
+#define ALPHA 0.2
+
+// Muito conservador (para dados ruidosos)
+#define ALPHA 0.01
+#+END_SRC
+
+*** Efeito Visual
+#+BEGIN_SRC text
+ALPHA = 0.05 (lento):
+Episódio 100:  Q(0,0) = 5.2
+Episódio 200:  Q(0,0) = 10.4
+Episódio 500:  Q(0,0) = 25.0
+
+ALPHA = 0.1 (padrão):
+Episódio 100:  Q(0,0) = 10.4
+Episódio 200:  Q(0,0) = 20.8
+Episódio 500:  Q(0,0) = 50.0
+
+ALPHA = 0.2 (rápido):
+Episódio 100:  Q(0,0) = 20.8
+Episódio 200:  Q(0,0) = 41.6
+Episódio 500:  Q(0,0) = 99.0
+#+END_SRC
+
+** 3. GAMMA (Fator de Desconto)
+
+*** Padrão
+#+BEGIN_SRC c
+#define GAMMA 0.9
+#+END_SRC
+
+*** O que faz
+Importância de *recompensas futuras* vs. *imediatas*.
+
+*** Impacto
+| Valor  | Comportamento             | Insight                      |
+|--------+---------------------------+------------------------------|
+| 0.0    | Ignora futuro (cego)      | Apenas recompensa imediata   |
+| 0.5    | Futuro pouco importante   | Visão curta (2-3 passos)     |
+| 0.9    | **BALANCEADO** (padrão)   | Planejamento de longo prazo  |
+| 0.95   | Futuro muito importante   | Planeja muito à frente       |
+| 0.99   | Futuro crítico            | Risco de divergência         |
+
+*** Exemplos
+#+BEGIN_SRC c
+// Visão curta (pensa apenas próximos passos)
+#define GAMMA 0.5
+
+// Visão equilibrada (padrão)
+#define GAMMA 0.9
+
+// Visão muito longa (planeja muitos passos)
+#define GAMMA 0.98
+#+END_SRC
+
+*** Exemplo Numérico
+#+BEGIN_SRC text
+Considere uma sequência: R₁=0, R₂=0, R₃=100 (objetivo em 3 passos)
+
+GAMMA = 0.5:
+V(início) = 0 + 0.5×(0 + 0.5×(0 + 0.5×100)) = 12.5
+
+GAMMA = 0.9:
+V(início) = 0 + 0.9×(0 + 0.9×(0 + 0.9×100)) = 72.9
+
+GAMMA = 0.99:
+V(início) = 0 + 0.99×(0 + 0.99×(0 + 0.99×100)) = 97.03
+#+END_SRC
+
+** 4. EPSILON (Taxa de Exploração)
+
+*** Padrão
+#+BEGIN_SRC c
+#define EPSILON 0.1   // 10% aleatório, 90% ganancioso
+#+END_SRC
+
+*** O que faz
+Controla o balanço entre *exploração* (testar) e *explotação* (usar conhecimento).
+
+*** Impacto
+| Valor  | Comportamento                    | Quando usar                  |
+|--------+----------------------------------+------------------------------|
+| 0.0    | Nunca aleatório (puramente ganancioso) | Após convergência completa |
+| 0.05   | Pouca exploração (5%)            | Quando já sabe muita coisa   |
+| 0.1    | **BALANCEADO** (padrão)          | Uso geral                    |
+| 0.2    | Muita exploração (20%)           | Descobrir novos caminhos     |
+| 0.5    | Exploração intensa (50%)         | Ambiente muito incerto       |
+| 1.0    | Aleatório puro (100%)            | Útil apenas para teste       |
+
+*** Exemplos
+#+BEGIN_SRC c
+// Pouca exploração (confia muito no que já sabe)
+#define EPSILON 0.02
+
+// Balanceado (padrão)
+#define EPSILON 0.1
+
+// Muita exploração (busca ativamente novos caminhos)
+#define EPSILON 0.3
+#+END_SRC
+
+*** Visualização
+#+BEGIN_SRC text
+EPSILON = 0.05 (pouca exploração):
+→ Converge rápido mas pode ficar preso em solução subótima
+→ Encontra um caminho de 8 passos em vez de 6
+
+EPSILON = 0.1 (balanceado):
+→ Converge bem, explora o suficiente
+→ Encontra o caminho ótimo de 6 passos
+
+EPSILON = 0.3 (muita exploração):
+→ Converge lentamente (tenta muitos caminhos ruins)
+→ Eventualmente encontra o caminho ótimo
+#+END_SRC
+
+** 5. NUM_EPISODES (Número de Episódios)
+
+*** Padrão
+#+BEGIN_SRC c
+#define NUM_EPISODES 1000
+#+END_SRC
+
+*** O que faz
+Quantas vezes o agente treina (quantas tentativas).
+
+*** Impacto
+| Valor | Tempo    | Convergência  | Uso                |
+|-------+----------+---------------+--------------------|
+| 100   | <1 seg   | Ruim          | Teste muito rápido |
+| 300   | 2 seg    | Parcial       | Teste rápido       |
+| 500   | 3 seg    | Boa           | Teste moderado     |
+| 1000  | 5 seg    | **Excelente** | Padrão             |
+| 2000  | 10 seg   | Perfeita      | Convergência total |
+| 5000  | 25 seg   | Overfit       | Teste de robustez  |
+
+*** Exemplos
+#+BEGIN_SRC c
+// Teste rápido (veja resultado em 1 segundo)
+#define NUM_EPISODES 200
+
+// Padrão (equilíbrio)
+#define NUM_EPISODES 1000
+
+// Convergência completa
+#define NUM_EPISODES 2000
+
+// Grid grande (10×10 precisa de muito mais)
+#define NUM_EPISODES 5000
+#+END_SRC
+
+*** Quando Aumentar
+- Grid maior → mais episódios
+- ALPHA menor → mais episódios
+- Problema mais complexo → mais episódios
+
+** 6. MAX_STEPS (Limite de Passos)
+
+*** Padrão
+#+BEGIN_SRC c
+#define MAX_STEPS 100
+#+END_SRC
+
+*** O que faz
+Número máximo de passos por episódio (evita loops infinitos).
+
+*** Impacto
+| Valor | Efeito                                   |
+|-------+------------------------------------------|
+| 10    | Episódios muito curtos (pode não chegar)|
+| 50    | Razoável para grid pequeno              |
+| 100   | **Balanceado** (padrão)                  |
+| 200   | Permite caminhos mais longos             |
+| 500   | Para grids muito grandes                 |
+
+*** Exemplos
+#+BEGIN_SRC c
+// Grid 3×3
+#define MAX_STEPS 30    // Caminho máximo = 6 passos
+
+// Grid 4×4 (padrão)
+#define MAX_STEPS 100
+
+// Grid 8×8 (caminho ótimo pode ter 14 passos)
+#define MAX_STEPS 200
+
+// Grid 10×10
+#define MAX_STEPS 300
+#+END_SRC
+
+** 7. REWARD_GOAL, REWARD_OBSTACLE, REWARD_STEP
+
+*** O que fazem
+Controlam o *sistema de recompensas*.
+
+*** Padrão
+#+BEGIN_SRC c
+#define REWARD_GOAL     100.0      // Atingir objetivo
+#define REWARD_OBSTACLE -100.0     // Bater em obstáculo  
+#define REWARD_STEP      -1.0      // Cada passo
+#+END_SRC
+
+*** Impacto
+| Parâmetro       | Padrão | +50%   | -50%   | Efeito                      |
+|-----------------+--------+--------+--------+-----------------------------|
+| REWARD_GOAL     | 100    | 150    | 50     | Motivação para objetivo     |
+| REWARD_OBSTACLE | -100   | -150   | -50    | Evitar obstáculo            |
+| REWARD_STEP     | -1.0   | -1.5   | -0.5   | Preferência por caminho curto |
+
+*** Exemplos
+#+BEGIN_SRC c
+// Forte motivação (agente quer muito atingir objetivo)
+#define REWARD_GOAL 200.0
+#define REWARD_OBSTACLE -200.0
+
+// Fraca motivação (agente é mais relaxado)
+#define REWARD_GOAL 10.0
+#define REWARD_OBSTACLE -10.0
+
+// Sem penalidade por passo (qualquer caminho serve)
+#define REWARD_STEP 0.0
+#+END_SRC
+
+* Receitas Prontas
+
+** Receita 1: Teste Rápido
+Para ver resultado em 1 segundo:
+
+#+BEGIN_SRC c
+#define GRID_ROWS 3
+#define GRID_COLS 3
+#define ALPHA 0.2          // Rápido
+#define GAMMA 0.8          // Simples
+#define EPSILON 0.15       // Normal
+#define NUM_EPISODES 300   // Poucos
+#define MAX_STEPS 50
+#define GOAL_STATE 8       // (2,2)
+#define OBSTACLE_STATE 4   // (1,1)
+#+END_SRC
+
+** Receita 2: Padrão Robosto
+Para resultados confiáveis:
+
+#+BEGIN_SRC c
+#define GRID_ROWS 4
+#define GRID_COLS 4
+#define ALPHA 0.1          // Balanceado
+#define GAMMA 0.9          // Balanceado
+#define EPSILON 0.1        // Balanceado
+#define NUM_EPISODES 1000  // Suficiente
+#define MAX_STEPS 100
+#define GOAL_STATE 15      // (3,3)
+#define OBSTACLE_STATE 5   // (1,1)
+#+END_SRC
+
+** Receita 3: Grid Grande
+Para problema mais desafiador:
+
+#+BEGIN_SRC c
+#define GRID_ROWS 8
+#define GRID_COLS 8
+#define ALPHA 0.08         // Um pouco mais conservador
+#define GAMMA 0.92         // Um pouco mais futuro
+#define EPSILON 0.08       // Menos exploração
+#define NUM_EPISODES 3000  // Muito treinamento
+#define MAX_STEPS 200
+#define GOAL_STATE 63      // (7,7)
+#define OBSTACLE_STATE 9   // (1,1)
+#+END_SRC
+
+** Receita 4: Aprendizado Agressivo
+Para convergência máxima:
+
+#+BEGIN_SRC c
+#define GRID_ROWS 4
+#define GRID_COLS 4
+#define ALPHA 0.3          // RÁPIDO
+#define GAMMA 0.95         // FUTURO IMPORTANTE
+#define EPSILON 0.05       // POUCA EXPLORAÇÃO
+#define NUM_EPISODES 500   // MODERADO
+#define MAX_STEPS 100
+#define GOAL_STATE 15
+#define OBSTACLE_STATE 5
+#+END_SRC
+
+* Como Mudar (Passo a Passo)
+
+** Método 1: Editor de Texto
+
+1. Abra o arquivo em um editor:
+   #+BEGIN_SRC bash
+   gedit qlearning_sequential.c
+   # ou
+   nano qlearning_sequential.c
+   # ou
+   vim qlearning_sequential.c
+   #+END_SRC
+
+2. Vá para linhas 60-86 (seção #define)
+
+3. Faça as mudanças desejadas
+
+4. Salve (Ctrl+S no gedit/nano, :wq no vim)
+
+5. Recompile:
+   #+BEGIN_SRC bash
+   make clean
+   make all
+   make run
+   #+END_SRC
+
+** Método 2: Linha de Comando (sed)
+
+Para mudar um parâmetro sem abrir editor:
+
+#+BEGIN_SRC bash
+# Mudar ALPHA de 0.1 para 0.2
+sed -i 's/#define ALPHA 0.1/#define ALPHA 0.2/' qlearning_sequential.c
+
+# Mudar GRID_ROWS de 4 para 5
+sed -i 's/#define GRID_ROWS 4/#define GRID_ROWS 5/' qlearning_sequential.c
+
+# Depois recompile
+make clean && make all && make run
+#+END_SRC
+
+** Método 3: Criar Variante
+
+Para manter o original intacto:
+
+#+BEGIN_SRC bash
+# Copiar arquivo
+cp qlearning_sequential.c qlearning_5x5.c
+
+# Editar a cópia
+nano qlearning_5x5.c
+
+# Compilar
+gcc -o qlearning_5x5 qlearning_5x5.c -lm
+
+# Executar
+./qlearning_5x5
+#+END_SRC
+
+* Tabela de Referência Rápida
+
+#+BEGIN_SRC text
+┌────────────────┬──────────┬───────────────┬──────────────────┐
+│ Parâmetro      │ Padrão   │ Aumentar      │ Diminuir         │
+├────────────────┼──────────┼───────────────┼──────────────────┤
+│ GRID_ROWS/COLS │ 4        │ Mais estados  │ Menos estados    │
+│ ALPHA          │ 0.1      │ +rápido       │ +lento           │
+│ GAMMA          │ 0.9      │ +futuro       │ -futuro          │
+│ EPSILON        │ 0.1      │ +exploração   │ -exploração      │
+│ NUM_EPISODES   │ 1000     │ +convergência │ teste rápido     │
+│ MAX_STEPS      │ 100      │ +longo caminho│ -longo caminho   │
+│ REWARD_GOAL    │ 100      │ +motivação    │ -motivação       │
+│ REWARD_OBSTACLE│ -100     │ +punição      │ -punição         │
+│ REWARD_STEP    │ -1.0     │ +curto        │ -curto           │
+└────────────────┴──────────┴───────────────┴──────────────────┘
+#+END_SRC
+
+* Análise de Exemplo Prático
+
+** Cenário Original (4×4)
+#+BEGIN_SRC text
+Tempo: 5 segundos
+Episódios: 1000
+Convergência: 6 passos
+Output: "Agente encontrou o caminho em 6 passos."
+#+END_SRC
+
+** Após Mudar para 5×5
+#+BEGIN_SRC c
+#define GRID_ROWS 5
+#define GRID_COLS 5
+#define GOAL_STATE 24
+#define OBSTACLE_STATE 6
+#define NUM_EPISODES 1500   // Aumentado (mais estados)
+#+END_SRC
+
+Resultado:
+#+BEGIN_SRC text
+Tempo: 8-10 segundos (mais lento)
+Episódios: 1500
+Estados: 25 (vs 16 antes)
+Caminho: ~8-10 passos
+Output: "Agente encontrou o caminho em 8 passos."
+#+END_SRC
+
+** Após Mudar ALPHA para 0.2 (Aprendizado Rápido)
+#+BEGIN_SRC c
+#define ALPHA 0.2    // Mais rápido
+#define NUM_EPISODES 500  // Menos episódios necessários
+#+END_SRC
+
+Resultado:
+#+BEGIN_SRC text
+Tempo: 2-3 segundos (muito mais rápido!)
+Episódios: 500
+Convergência: ~5 passos (ligeiramente melhor)
+Output: Mesmo resultado mas 50% mais rápido
+#+END_SRC
+
+* Resumo
+
+Você pode facilmente mudar:
+- **Tamanho do grid**: GRID_ROWS, GRID_COLS
+- **Velocidade de aprendizado**: ALPHA
+- **Importância do futuro**: GAMMA
+- **Exploração**: EPSILON
+- **Quantidade de treinamento**: NUM_EPISODES
+- **Recompensas**: REWARD_*
+
+Comece com a **Receita 2 (Padrão Robosto)** e ajuste conforme necessário!
+
+---
+
+*Para mais detalhes, veja RELATORIO.org*

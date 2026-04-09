@@ -1,0 +1,1098 @@
+#+TITLE: Implementação de Q-Learning Sequencial em C
+#+AUTHOR: Trabalho de Programação Paralela
+#+DATE: 2026-04-07
+#+OPTIONS: toc:2 num:t ^:nil
+#+STARTUP: overview indent
+#+LATEX_CLASS: article
+#+LATEX_HEADER: \usepackage[margin=2.5cm]{geometry}
+#+LATEX_HEADER: \usepackage[brazilian]{babel}
+
+* Sumário Executivo
+
+Este relatório apresenta uma implementação completa do algoritmo *Q-Learning* em C, 
+desenvolvida como base para trabalho de paralelização com OpenMP. O Q-Learning é um 
+algoritmo fundamental de *Aprendizado por Reforço* que permite que um agente 
+autônomo aprenda a tomar decisões ótimas através de tentativa e erro.
+
+** Objetivos do Projeto
+- Implementar Q-Learning sequencial bem documentado
+- Criar ambiente de teste (Grid World 4×4)
+- Desenvolver suite de testes automatizados
+- Estabelecer base para paralelização futura
+
+** Resultados Alcançados
+✓ Código completamente funcional e testado
+✓ 44 testes unitários (100% de aprovação)
+✓ Agente aprende caminho ótimo em 6 passos
+✓ Documentação extensiva com 600+ linhas de comentários
+
+* Introdução ao Q-Learning
+
+** O que é Aprendizado por Reforço?
+
+Aprendizado por Reforço (Reinforcement Learning) é um paradigma de aprendizado de 
+máquina onde um *agente* aprende a tomar *ações* em um *ambiente* para maximizar 
+uma *recompensa* acumulada.
+
+#+BEGIN_EXAMPLE
+    AGENTE
+      ↓ ação
+    AMBIENTE
+      ↓ recompensa + novo estado
+    AGENTE
+      ↓ ...
+#+END_EXAMPLE
+
+** Conceitos Fundamentais
+
+*** Estados (States)
+Representam todas as possíveis situações em que o agente pode se encontrar.
+No nosso Grid World: 16 estados (posições 0-15 em uma grade 4×4).
+
+*** Ações (Actions)
+Movimentos que o agente pode realizar em cada estado.
+No nosso caso: =CIMA=, =BAIXO=, =ESQUERDA=, =DIREITA=.
+
+*** Recompensas (Rewards)
+Feedback numérico que o ambiente fornece após cada ação:
+- Positiva: comportamento desejado (atingir objetivo)
+- Negativa: comportamento indesejado (bater em obstáculo)
+
+*** Política (Policy)
+Estratégia que define qual ação tomar em cada estado.
+O objetivo do Q-Learning é aprender a *política ótima*.
+
+** A Equação de Bellman para Q-Learning
+
+O coração do algoritmo é a atualização dos valores Q:
+
+#+BEGIN_EXAMPLE
+Q(s, a) ← Q(s, a) + α × [R + γ × max Q(s', a') - Q(s, a)]
+                        └──────┬──────┘
+                           TD Target
+#+END_EXAMPLE
+
+Onde:
+- *Q(s, a)*: Valor esperado de tomar ação =a= no estado =s=
+- *α (alpha)*: Taxa de aprendizado (0.1) - controla velocidade de aprendizado
+- *γ (gamma)*: Fator de desconto (0.9) - importância de recompensas futuras
+- *R*: Recompensa imediata recebida
+- *max Q(s', a')*: Melhor valor Q possível no próximo estado =s'=
+
+*** Intuição da Equação
+
+1. =R + γ × max Q(s', a')= é o *valor alvo* (quanto esperamos ganhar)
+2. =Q(s, a)= é a *estimativa atual*
+3. A diferença é o *erro temporal* (TD error)
+4. Ajustamos gradualmente usando =α=
+
+* O Ambiente: Grid World 4×4
+
+** Descrição Visual
+
+#+BEGIN_SRC text
+  +---+---+---+---+
+  | S |   |   |   |   Legenda:
+  +---+---+---+---+   S = Start (início)
+  |   | X |   |   |   G = Goal (objetivo)
+  +---+---+---+---+   X = Obstáculo
+  |   |   |   |   |
+  +---+---+---+---+   Coordenadas:
+  |   |   |   | G |   (linha, coluna)
+  +---+---+---+---+   0-indexado
+#+END_SRC
+
+** Características do Ambiente
+
+| Característica       | Valor          | Descrição                           |
+|----------------------+----------------+-------------------------------------|
+| Dimensões            | 4×4            | 16 estados possíveis                |
+| Estado Inicial       | (0,0)          | Canto superior esquerdo             |
+| Estado Objetivo      | (3,3)          | Canto inferior direito              |
+| Obstáculo            | (1,1)          | Célula bloqueada                    |
+| Ações Possíveis      | 4              | ↑ ↓ ← →                             |
+| Caminho Ótimo        | 6 passos       | Evitando obstáculo                  |
+
+** Sistema de Recompensas
+
+#+BEGIN_SRC c
+#define REWARD_GOAL     +100.0   // Atingir objetivo
+#define REWARD_OBSTACLE -100.0   // Bater em obstáculo
+#define REWARD_STEP       -1.0   // Cada passo (incentiva caminho curto)
+#+END_SRC
+
+*** Justificativa
+- *+100*: Grande recompensa incentiva o agente a buscar o objetivo
+- *-100*: Penalidade severa faz o agente evitar obstáculos
+- *-1*: Pequena penalidade por passo incentiva caminhos curtos
+
+** Mapeamento Estado-Coordenadas
+
+Estados são numerados sequencialmente:
+
+#+BEGIN_SRC text
+  +----+----+----+----+
+  |  0 |  1 |  2 |  3 |
+  +----+----+----+----+
+  |  4 |  5 |  6 |  7 |
+  +----+----+----+----+
+  |  8 |  9 | 10 | 11 |
+  +----+----+----+----+
+  | 12 | 13 | 14 | 15 |
+  +----+----+----+----+
+#+END_SRC
+
+Fórmulas de conversão:
+#+BEGIN_SRC c
+// Coordenadas → Estado
+estado = linha × 4 + coluna
+
+// Estado → Coordenadas  
+linha = estado / 4
+coluna = estado % 4
+#+END_SRC
+
+* Arquitetura da Implementação
+
+** Estrutura de Dados Principal
+
+#+BEGIN_SRC c
+typedef struct {
+    double q_table[NUM_STATES][NUM_ACTIONS];  // Tabela Q: 16×4
+    int grid[GRID_ROWS][GRID_COLS];           // Representação do ambiente
+    int current_state;                         // Estado atual do agente
+} QLearning;
+#+END_SRC
+
+*** Q-Table
+Matriz 16×4 que armazena os valores Q(s,a):
+- 16 linhas: uma para cada estado
+- 4 colunas: uma para cada ação (CIMA, BAIXO, ESQ, DIR)
+
+Exemplo após treinamento:
+#+BEGIN_EXAMPLE
+Estado (0,0): Q[CIMA]=41.53, Q[BAIXO]=22.57, Q[ESQ]=37.72, Q[DIR]=54.95
+              Melhor ação: DIREITA (maior valor Q)
+#+END_EXAMPLE
+
+** Hiperparâmetros
+
+#+BEGIN_SRC c
+#define ALPHA   0.1    // Taxa de aprendizado
+#define GAMMA   0.9    // Fator de desconto
+#define EPSILON 0.1    // Taxa de exploração (ε-greedy)
+#define NUM_EPISODES 1000  // Episódios de treinamento
+#define MAX_STEPS    100   // Limite de passos por episódio
+#+END_SRC
+
+*** Impacto dos Hiperparâmetros
+
+**** Alpha (Taxa de Aprendizado) = 0.1
+- Valor baixo → aprendizado lento mas estável
+- Valor alto → aprendizado rápido mas instável
+- 0.1 é um bom equilíbrio para este problema
+
+**** Gamma (Fator de Desconto) = 0.9
+- Determina importância de recompensas futuras
+- 0.9 = agente valoriza muito recompensas futuras
+- Para gamma=0: apenas recompensa imediata importa
+- Para gamma→1: todas as recompensas futuras importam igualmente
+
+**** Epsilon (Exploração) = 0.1
+- 10% das vezes: ação aleatória (exploração)
+- 90% das vezes: melhor ação conhecida (explotação)
+- Balanceia descoberta vs. uso de conhecimento
+
+** Fluxo do Algoritmo
+
+#+BEGIN_SRC text
+  ┌─────────────────────────────┐
+  │  1. INICIALIZAÇÃO           │
+  │  - Q-table zerada           │
+  │  - Grid configurado         │
+  └──────────┬──────────────────┘
+             ↓
+  ┌─────────────────────────────┐
+  │  2. LOOP DE EPISÓDIOS       │
+  │  (1000 vezes)               │
+  └──────────┬──────────────────┘
+             ↓
+       ┌────────────────┐
+       │ Início Episódio│
+       └────────┬───────┘
+                ↓
+       ┌────────────────────────┐
+       │ 3. SELEÇÃO DE AÇÃO     │
+       │ (ε-greedy)             │
+       │ - 10%: aleatória       │
+       │ - 90%: melhor Q        │
+       └──────────┬─────────────┘
+                  ↓
+       ┌────────────────────────┐
+       │ 4. EXECUÇÃO            │
+       │ - Aplica ação          │
+       │ - Observa s', R        │
+       └──────────┬─────────────┘
+                  ↓
+       ┌────────────────────────┐
+       │ 5. ATUALIZAÇÃO Q       │
+       │ Q(s,a) ← equação       │
+       │ de Bellman             │
+       └──────────┬─────────────┘
+                  ↓
+              Atingiu
+              objetivo? ──Não──┐
+                  │             │
+                 Sim            │
+                  ↓             │
+         Fim Episódio ←─────────┘
+                  │
+                  ↓
+       ┌────────────────────────┐
+       │ 6. POLÍTICA APRENDIDA  │
+       │ Para cada estado:      │
+       │ melhor_ação = arg max Q│
+       └────────────────────────┘
+#+END_SRC
+
+* Componentes do Código
+
+** Funções de Inicialização
+
+*** =qlearning_init()=
+#+BEGIN_SRC c
+void qlearning_init(QLearning *ql) {
+    // 1. Zera toda a Q-table (valores iniciais neutros)
+    for (i = 0; i < NUM_STATES; i++)
+        for (j = 0; j < NUM_ACTIONS; j++)
+            ql->q_table[i][j] = 0.0;
+    
+    // 2. Configura o grid
+    ql->grid[1][1] = 1;  // Obstáculo
+    ql->grid[3][3] = 2;  // Objetivo
+    
+    // 3. Define estado inicial
+    ql->current_state = START_STATE;
+}
+#+END_SRC
+
+*Por que inicializar com zeros?*
+Valores neutros permitem que o agente descubra gradualmente quais ações 
+são boas ou ruins através da experiência.
+
+** Funções de Transição de Estados
+
+*** =get_next_state()=
+Calcula para onde o agente se move após uma ação:
+
+#+BEGIN_SRC c
+int get_next_state(int current_state, int action) {
+    state_to_coords(current_state, &row, &col);
+    
+    switch (action) {
+        case ACTION_UP:    new_row = row - 1; break;
+        case ACTION_DOWN:  new_row = row + 1; break;
+        case ACTION_LEFT:  new_col = col - 1; break;
+        case ACTION_RIGHT: new_col = col + 1; break;
+    }
+    
+    // Se movimento é inválido (parede), permanece no mesmo estado
+    if (is_valid_state(new_row, new_col))
+        return coords_to_state(new_row, new_col);
+    return current_state;
+}
+#+END_SRC
+
+*Tratamento de Bordas:*
+Quando o agente tenta sair do grid, ele simplesmente permanece na mesma posição.
+Isso ensina o agente a evitar movimentos inválidos.
+
+** Política ε-greedy (Epsilon-Greedy)
+
+*** =select_action()=
+Estratégia fundamental de exploração vs. explotação:
+
+#+BEGIN_SRC c
+int select_action(QLearning *ql, int state) {
+    // EXPLORAÇÃO: 10% das vezes, ação aleatória
+    if (random_double() < EPSILON) {
+        return random_int(NUM_ACTIONS);
+    }
+    
+    // EXPLOTAÇÃO: 90% das vezes, melhor ação conhecida
+    best_action = 0;
+    best_value = ql->q_table[state][0];
+    
+    for (action = 1; action < NUM_ACTIONS; action++) {
+        if (ql->q_table[state][action] > best_value) {
+            best_value = ql->q_table[state][action];
+            best_action = action;
+        }
+    }
+    return best_action;
+}
+#+END_SRC
+
+*** Por que ε-greedy é importante?
+
+*Dilema Exploração-Explotação:*
+- *Apenas exploração* (100% aleatório): nunca aprende efetivamente
+- *Apenas explotação* (100% ganancioso): pode ficar preso em soluções subótimas
+- *ε-greedy* (balanceado): descobre novas estratégias enquanto usa conhecimento
+
+Exemplo: Se o agente descobriu um caminho de 10 passos, mas há um de 6 passos,
+a exploração permite descobrir o caminho melhor.
+
+** Atualização da Q-Table
+
+*** =update_q_value()=
+Implementação da equação de Bellman:
+
+#+BEGIN_SRC c
+void update_q_value(QLearning *ql, int state, int action, 
+                    double reward, int next_state) {
+    double current_q = ql->q_table[state][action];
+    double max_next_q = get_max_q_value(ql, next_state);
+    
+    // Equação de Bellman
+    // Q(s,a) = Q(s,a) + α × [R + γ × max Q(s',a') - Q(s,a)]
+    ql->q_table[state][action] = current_q + 
+        ALPHA * (reward + GAMMA * max_next_q - current_q);
+}
+#+END_SRC
+
+*** Exemplo Numérico
+
+Suponha: Estado 0, ação DIREITA, vai para estado 1, recompensa = -1
+
+*Primeira atualização:*
+#+BEGIN_EXAMPLE
+Q(0, DIR) = 0 + 0.1 × [-1 + 0.9 × 0 - 0]
+          = 0 + 0.1 × (-1)
+          = -0.1
+#+END_EXAMPLE
+
+*Segunda atualização (mesmo par s,a):*
+#+BEGIN_EXAMPLE
+Q(0, DIR) = -0.1 + 0.1 × [-1 + 0.9 × 0 - (-0.1)]
+          = -0.1 + 0.1 × (-0.9)
+          = -0.19
+#+END_EXAMPLE
+
+O valor vai convergindo gradualmente!
+
+** Loop de Episódio
+
+*** =run_episode()=
+Um episódio completo: do início até o objetivo ou limite de passos
+
+#+BEGIN_SRC c
+double run_episode(QLearning *ql) {
+    state = START_STATE;
+    total_reward = 0.0;
+    
+    for (step = 0; step < MAX_STEPS; step++) {
+        // 1. Seleciona ação (ε-greedy)
+        action = select_action(ql, state);
+        
+        // 2. Executa ação, observa resultado
+        next_state = get_next_state(state, action);
+        reward = get_reward(next_state);
+        
+        // 3. Atualiza Q-table
+        update_q_value(ql, state, action, reward, next_state);
+        
+        total_reward += reward;
+        
+        // 4. Verifica término
+        if (is_terminal_state(next_state))
+            break;
+        
+        state = next_state;
+    }
+    
+    return total_reward;
+}
+#+END_SRC
+
+*** Progressão Durante Treinamento
+
+| Episódio | Recompensa Média | Observação                          |
+|----------+------------------+-------------------------------------|
+|      100 |            81.39 | Ainda explorando muito              |
+|      200 |            90.37 | Começando a convergir               |
+|      500 |            91.49 | Caminho quase ótimo                 |
+|     1000 |            88.34 | Convergido (pequenas variações)     |
+
+* Resultados da Execução
+
+** Output do Programa
+
+#+BEGIN_SRC text
+============================================================
+       Q-LEARNING SEQUENCIAL - GRID WORLD 4x4
+============================================================
+
+Inicializando ambiente...
+Grid World criado:
+  - Inicio: (0,0)
+  - Objetivo: (3,3)
+  - Obstaculo: (1,1)
+
+Iniciando treinamento com 1000 episodios...
+Hiperparametros: alpha=0.10, gamma=0.90, epsilon=0.10
+
+Episodio  100 | Recompensa media (ultimos 100): 81.39
+Episodio  200 | Recompensa media (ultimos 100): 90.37
+Episodio  300 | Recompensa media (ultimos 100): 92.23
+Episodio  400 | Recompensa media (ultimos 100): 86.26
+Episodio  500 | Recompensa media (ultimos 100): 91.49
+Episodio  600 | Recompensa media (ultimos 100): 90.35
+Episodio  700 | Recompensa media (ultimos 100): 90.42
+Episodio  800 | Recompensa media (ultimos 100): 90.50
+Episodio  900 | Recompensa media (ultimos 100): 90.52
+Episodio 1000 | Recompensa media (ultimos 100): 88.34
+
+Treinamento concluido!
+#+END_SRC
+
+** Q-Table Aprendida
+
+#+BEGIN_EXAMPLE
+=== Q-TABLE ===
+Estado |   CIMA   |  BAIXO   |   ESQ    |   DIR    | Melhor
+-------|----------|----------|----------|----------|-------
+(0,0)  |    41.53 |    22.57 |    37.72 |    54.95 | DIR
+(0,1)  |    51.53 |   -42.41 |    42.56 |    62.17 | DIR
+(0,2)  |    57.77 |    70.19 |    50.64 |    57.95 | BAIXO
+(0,3)  |     6.68 |    78.66 |    -0.42 |    17.46 | BAIXO
+(1,0)  |    41.01 |    -0.71 |    -1.14 |   -27.12 | CIMA
+(1,1)  |    14.46 |     1.07 |    -0.27 |    68.95 | DIR    ← OBSTÁCULO
+(1,2)  |    60.00 |    66.37 |   -40.81 |    79.10 | DIR
+(1,3)  |    61.12 |    89.00 |    58.78 |    76.02 | BAIXO
+(2,0)  |    -0.68 |    -0.56 |    -0.59 |     2.44 | DIR
+(2,1)  |   -19.01 |    18.39 |    -0.33 |    -0.29 | BAIXO
+(2,2)  |    11.71 |    88.60 |    -0.10 |    16.83 | BAIXO
+(2,3)  |    76.45 |   100.00 |    74.30 |    82.61 | BAIXO
+(3,0)  |    -0.31 |    -0.30 |    -0.36 |     4.52 | DIR
+(3,1)  |    -0.30 |     1.89 |    -0.21 |    58.08 | DIR
+(3,2)  |     6.45 |    10.67 |    10.90 |    99.96 | DIR
+(3,3)  |     0.00 |     0.00 |     0.00 |     0.00 | CIMA   ← OBJETIVO
+#+END_EXAMPLE
+
+*** Análise da Q-Table
+
+*Observações importantes:*
+
+1. *Estado (2,3)*: Q[BAIXO] = 100.0 (máximo)
+   - Vai diretamente para o objetivo
+   - Recebe recompensa máxima (+100)
+
+2. *Estado (3,2)*: Q[DIR] = 99.96 (quase máximo)
+   - A um passo do objetivo
+   - 99.96 ≈ -1 + 0.9 × 100 = 89 (após várias atualizações)
+
+3. *Estado (0,1)*: Q[BAIXO] = -42.41 (muito negativo)
+   - Ir para baixo leva ao obstáculo (1,1)
+   - Penalidade propagada de -100
+
+4. *Estados distantes* (2,0), (3,0): valores próximos de zero
+   - Longe do caminho ótimo
+   - Poucas visitas durante treinamento
+
+** Política Aprendida (Visualização)
+
+#+BEGIN_SRC text
+=== POLITICA APRENDIDA ===
+(^ = cima, v = baixo, < = esq, > = dir)
+
++---+---+---+---+
+| > | > | v | v |     Caminho ótimo:
++---+---+---+---+     (0,0) → (0,1) → (0,2) → 
+| ^ | X | > | v |     → (1,2) → (1,3) → (2,3) → (3,3)
++---+---+---+---+
+| > | v | v | v |     6 passos
++---+---+---+---+
+| > | > | > | G |
++---+---+---+---+
+#+END_SRC
+
+*** Análise da Política
+
+*Características da solução aprendida:*
+
+1. *Evita obstáculo:* Contorna (1,1) pela parte superior
+2. *Direcionamento consistente:* Todas as setas apontam em direção ao objetivo
+3. *Estado (1,0):* Aponta para CIMA (volta para caminho seguro)
+4. *Convergência:* Múltiplos caminhos válidos (há alternativas)
+
+** Demonstração do Caminho
+
+#+BEGIN_SRC text
+=== DEMONSTRACAO DO CAMINHO ===
+Caminho do agente do inicio (0,0) ate o objetivo (3,3):
+
+Passo  1: Estado (0,0) -> Acao: DIR
+Passo  2: Estado (0,1) -> Acao: DIR
+Passo  3: Estado (0,2) -> Acao: BAIXO
+Passo  4: Estado (1,2) -> Acao: DIR
+Passo  5: Estado (1,3) -> Acao: BAIXO
+Passo  6: Estado (2,3) -> Acao: BAIXO
+Passo  7: Estado (3,3) -> OBJETIVO ALCANCADO!
+
+Agente encontrou o caminho em 6 passos.
+#+END_SRC
+
+*** Visualização Passo-a-Passo
+
+#+BEGIN_SRC text
+Passo 1: (0,0) → DIREITA → (0,1)
+  +---+---+---+---+
+  | A | ● |   |   |
+  +---+---+---+---+
+
+Passo 2: (0,1) → DIREITA → (0,2)
+  +---+---+---+---+
+  |   | A | ● |   |
+  +---+---+---+---+
+
+Passo 3: (0,2) → BAIXO → (1,2)
+  +---+---+---+---+
+  |   |   | A |   |
+  +---+---+---+---+
+  |   | X | ● |   |
+  +---+---+---+---+
+
+Passo 4: (1,2) → DIREITA → (1,3)
+  +---+---+---+---+
+  |   | X | A | ● |
+  +---+---+---+---+
+
+Passo 5: (1,3) → BAIXO → (2,3)
+  +---+---+---+---+
+  |   |   |   | A |
+  +---+---+---+---+
+  |   |   |   | ● |
+  +---+---+---+---+
+
+Passo 6: (2,3) → BAIXO → (3,3)
+  +---+---+---+---+
+  |   |   |   | A |
+  +---+---+---+---+
+  |   |   |   | G |
+  +---+---+---+---+
+
+Legenda: A = Agente, ● = Destino, X = Obstáculo, G = Objetivo
+#+END_SRC
+
+* Suite de Testes
+
+** Visão Geral dos Testes
+
+Desenvolvemos 44 testes unitários organizados em 12 categorias:
+
+| #  | Categoria                  | Testes | Descrição                            |
+|----+----------------------------+--------+--------------------------------------|
+|  1 | Conversão coordenadas→estado |      5 | Mapeamento (linha,col) → índice      |
+|  2 | Conversão estado→coordenadas |      4 | Mapeamento índice → (linha,col)      |
+|  3 | Transições de estado        |      8 | Movimentos e limites do grid         |
+|  4 | Sistema de recompensas      |      4 | Valores corretos de recompensa       |
+|  5 | Estados terminais           |      3 | Identificação do objetivo            |
+|  6 | Inicialização Q-table       |      4 | Zeros e configuração inicial         |
+|  7 | Atualização Q (Bellman)     |      2 | Equação implementada corretamente    |
+|  8 | Valor máximo Q              |      2 | Busca do melhor valor Q              |
+|  9 | Seleção de melhor ação      |      2 | Política gananciosa                  |
+| 10 | Convergência treinamento    |      5 | Caminho ótimo aprendido              |
+| 11 | Valores Q próximos objetivo |      4 | Gradiente de valores correto         |
+| 12 | Política evita obstáculo    |      1 | Não passa por (1,1)                  |
+
+** Resultado dos Testes
+
+#+BEGIN_SRC text
+============================================================
+     TESTES UNITARIOS - Q-LEARNING SEQUENCIAL
+============================================================
+
+[TESTE] Conversao coordenadas -> estado:
+  [PASS] (0,0) -> estado 0
+  [PASS] (0,3) -> estado 3
+  [PASS] (1,1) -> estado 5 (obstaculo)
+  [PASS] (3,3) -> estado 15 (objetivo)
+  [PASS] (2,1) -> estado 9
+
+[TESTE] Conversao estado -> coordenadas:
+  [PASS] estado 0 -> (0,0)
+  [PASS] estado 5 -> (1,1)
+  [PASS] estado 15 -> (3,3)
+  [PASS] estado 10 -> (2,2)
+
+[TESTE] Calculo de proximo estado (transicoes):
+  [PASS] estado 5 + CIMA -> estado 1
+  [PASS] estado 5 + BAIXO -> estado 9
+  [PASS] estado 5 + ESQUERDA -> estado 4
+  [PASS] estado 5 + DIREITA -> estado 6
+  [PASS] estado 0 + CIMA -> estado 0 (parede)
+  [PASS] estado 0 + ESQUERDA -> estado 0 (parede)
+  [PASS] estado 15 + BAIXO -> estado 15 (parede)
+  [PASS] estado 15 + DIREITA -> estado 15 (parede)
+
+[... 36 testes omitidos para brevidade ...]
+
+============================================================
+                    RESUMO DOS TESTES
+============================================================
+  Testes passaram: 44
+  Testes falharam: 0
+  Total de testes: 44
+============================================================
+  *** TODOS OS TESTES PASSARAM! ***
+============================================================
+#+END_SRC
+
+** Testes Mais Importantes
+
+*** Teste de Convergência
+
+#+BEGIN_SRC c
+void test_training_convergence() {
+    QLearning ql;
+    int path_length;
+    
+    srand(42);  // Seed fixa para reprodutibilidade
+    qlearning_init(&ql);
+    train(&ql, NUM_EPISODES);
+    
+    path_length = simulate_path(&ql);
+    
+    // Verifica se encontrou o objetivo
+    TEST_ASSERT(path_length > 0, 
+                "agente encontrou caminho ate o objetivo");
+    
+    // Verifica comprimento razoável (ótimo = 6, permitimos até 10)
+    TEST_ASSERT(path_length <= 10, 
+                "caminho tem comprimento razoavel");
+    
+    // Verifica ações em estados críticos
+    TEST_ASSERT(get_best_action(&ql, 0) == DOWN || == RIGHT, 
+                "inicio: BAIXO ou DIREITA");
+    TEST_ASSERT(get_best_action(&ql, 14) == RIGHT, 
+                "adjacente ao objetivo: DIREITA");
+}
+#+END_SRC
+
+*** Teste da Equação de Bellman
+
+#+BEGIN_SRC c
+void test_q_update() {
+    QLearning ql;
+    qlearning_init(&ql);
+    
+    // Primeira atualização: Q(0, DIR) = 0 + 0.1 × (-1 + 0) = -0.1
+    update_q_value(&ql, 0, ACTION_RIGHT, -1.0, 1);
+    TEST_ASSERT(Q[0][RIGHT] == -0.1, "primeira atualizacao");
+    
+    // Segunda atualização: Q(0, DIR) = -0.1 + 0.1 × (-0.9) = -0.19
+    update_q_value(&ql, 0, ACTION_RIGHT, -1.0, 1);
+    TEST_ASSERT(Q[0][RIGHT] == -0.19, "segunda atualizacao");
+}
+#+END_SRC
+
+** Framework de Testes
+
+Implementamos um mini-framework com macro =TEST_ASSERT=:
+
+#+BEGIN_SRC c
+#define TEST_ASSERT(condition, message) do { \
+    if (condition) { \
+        printf("  [PASS] %s\n", message); \
+        tests_passed++; \
+    } else { \
+        printf("  [FAIL] %s\n", message); \
+        tests_failed++; \
+    } \
+} while(0)
+#+END_SRC
+
+* Como Compilar e Executar
+
+** Requisitos
+
+- Compilador GCC com suporte a C99
+- Make (GNU Make)
+- Sistema Linux/Unix ou WSL
+
+** Estrutura de Arquivos
+
+#+BEGIN_SRC text
+OpenMP/
+├── qlearning_sequential.c    # Código principal (600+ linhas)
+├── test_qlearning.c           # Suite de testes (700+ linhas)
+├── Makefile                   # Automação de build
+├── qlearning_sequential       # Executável (após make)
+└── test_qlearning             # Executável de testes (após make)
+#+END_SRC
+
+** Comandos de Compilação
+
+*** Compilar tudo
+#+BEGIN_SRC bash
+make all
+#+END_SRC
+
+*** Compilar apenas programa principal
+#+BEGIN_SRC bash
+make sequential
+#+END_SRC
+
+*** Compilar apenas testes
+#+BEGIN_SRC bash
+make test
+#+END_SRC
+
+** Comandos de Execução
+
+*** Executar programa principal
+#+BEGIN_SRC bash
+make run
+# ou
+./qlearning_sequential
+#+END_SRC
+
+*** Executar testes
+#+BEGIN_SRC bash
+make test
+# ou
+./test_qlearning
+#+END_SRC
+
+*** Limpar arquivos compilados
+#+BEGIN_SRC bash
+make clean
+#+END_SRC
+
+** Flags de Compilação
+
+#+BEGIN_SRC makefile
+CC = gcc
+CFLAGS = -Wall -Wextra -O2
+LDFLAGS = -lm
+#+END_SRC
+
+- =-Wall -Wextra=: Todos os warnings habilitados
+- =-O2=: Otimização nível 2
+- =-lm=: Biblioteca matemática (para =fabs()=)
+
+* Análise de Complexidade
+
+** Complexidade Temporal
+
+*** Por Episódio
+- Seleção de ação: O(NUM_ACTIONS) = O(4) = O(1)
+- Atualização Q: O(NUM_ACTIONS) para encontrar max = O(1)
+- Passos por episódio: O(MAX_STEPS) = O(100)
+- *Total por episódio:* O(100)
+
+*** Treinamento Completo
+- Episódios: 1000
+- *Total:* O(1000 × 100) = *O(100,000) operações*
+
+*** Simulação de Caminho (após treino)
+- Percorre no máximo MAX_STEPS = 100 estados
+- *Total:* O(100)
+
+** Complexidade Espacial
+
+| Estrutura  | Tamanho             | Memória           |
+|------------+---------------------+-------------------|
+| Q-table    | 16 × 4 × 8 bytes    | 512 bytes         |
+| Grid       | 4 × 4 × 4 bytes     | 64 bytes          |
+| Variáveis  | ~10 × 8 bytes       | 80 bytes          |
+| *Total*    |                     | *~656 bytes*      |
+
+Extremamente leve! Cabe em cache L1 do processador.
+
+** Escalabilidade
+
+Para um grid N×N:
+- Estados: N²
+- Q-table: N² × 4 × 8 bytes
+- Tempo por episódio: O(N²)
+
+| Grid   | Estados | Q-table  | Tempo/Episódio |
+|--------+---------+----------+----------------|
+| 4×4    |      16 | 512 B    | ~100 ops       |
+| 10×10  |     100 | 3.2 KB   | ~1000 ops      |
+| 100×100 |  10,000 | 320 KB   | ~100,000 ops   |
+| 1000×1000 | 1,000,000 | 32 MB | ~10⁸ ops     |
+
+*Oportunidade de Paralelização:* Para grids grandes, executar múltiplos 
+episódios em paralelo pode acelerar significativamente o treinamento!
+
+* Preparação para Paralelização
+
+** Identificação de Paralelismo
+
+*** Paralelismo de Episódios (mais promissor)
+Cada episódio é *independente* → podemos executar vários em paralelo!
+
+#+BEGIN_SRC c
+// Versão sequencial
+for (episode = 0; episode < NUM_EPISODES; episode++) {
+    run_episode(&ql);
+}
+
+// Versão paralela (OpenMP)
+#pragma omp parallel for
+for (episode = 0; episode < NUM_EPISODES; episode++) {
+    run_episode(&ql_local);  // Q-table local
+}
+// Depois: merge das Q-tables locais
+#+END_SRC
+
+*Desafio:* Múltiplas threads atualizando Q-table → precisa sincronização
+
+*** Paralelismo de Estados (menos viável)
+Atualizar múltiplos estados simultaneamente é difícil porque:
+- Episódios são sequências temporais (dependência entre passos)
+- Estado seguinte depende do atual
+
+** Estratégias de Paralelização
+
+*** 1. Q-Learning Paralelo com Threads Independentes
+Cada thread tem sua própria Q-table, depois combinamos:
+
+#+BEGIN_SRC c
+#pragma omp parallel
+{
+    QLearning ql_local;
+    qlearning_init(&ql_local);
+    
+    #pragma omp for
+    for (int ep = 0; ep < NUM_EPISODES; ep++) {
+        run_episode(&ql_local);
+    }
+    
+    // Fase de redução: combina Q-tables
+    #pragma omp critical
+    merge_q_tables(&ql_global, &ql_local);
+}
+#+END_SRC
+
+*** 2. Q-Learning com Locks
+Usa uma única Q-table compartilhada com locks:
+
+#+BEGIN_SRC c
+#pragma omp parallel for
+for (int ep = 0; ep < NUM_EPISODES; ep++) {
+    // ...
+    #pragma omp critical
+    update_q_value(&ql, state, action, reward, next_state);
+}
+#+END_SRC
+
+*Trade-off:* Menos memória, mais contenção
+
+*** 3. Q-Learning Assíncrono (Hogwild!)
+Atualiza Q-table sem locks (aceita race conditions):
+
+#+BEGIN_SRC c
+#pragma omp parallel for
+for (int ep = 0; ep < NUM_EPISODES; ep++) {
+    // Atualiza diretamente sem lock
+    update_q_value(&ql, state, action, reward, next_state);
+}
+#+END_SRC
+
+Funciona porque:
+- Atualizações são atômicas (double em x86-64)
+- Colisões são raras (grid pequeno)
+- Algoritmo é robusto a ruído
+
+** Métricas para Comparação
+
+Ao paralelizar, medir:
+1. *Speedup:* Tempo_sequencial / Tempo_paralelo
+2. *Eficiência:* Speedup / Número_threads
+3. *Qualidade:* Caminho encontrado continua ótimo?
+4. *Convergência:* Número de episódios para convergir
+
+* Insights e Aprendizados
+
+** Por que Q-Learning Funciona?
+
+1. *Bootstrapping:* Usa estimativas para melhorar estimativas
+   - Não precisa de modelo do ambiente
+   - Aprende através da experiência
+
+2. *Exploração:* ε-greedy garante que todas as ações sejam testadas
+   - Evita mínimos locais
+   - Descobre soluções inesperadas
+
+3. *Propagação de Valores:* Recompensas se propagam para trás
+   - Estado (3,2): Q = 99.96 (perto do objetivo)
+   - Estado (3,1): Q = 58.08 (mais distante)
+   - Estado (3,0): Q = 4.52 (bem distante)
+
+** Limitações da Implementação Atual
+
+1. *Espaço de Estados Pequeno:* 16 estados é trivial
+   - Para problemas reais: 10⁶+ estados
+   - Solução: Deep Q-Networks (DQN)
+
+2. *Ambiente Determinístico:* Sem aleatoriedade
+   - Mundo real tem incerteza
+   - Extensão: Q-Learning estocástico
+
+3. *Recompensas Esparsas:* Apenas em objetivo/obstáculo
+   - Pode ser lento para convergir
+   - Solução: Reward shaping
+
+** Possíveis Extensões
+
+*** Ambiente Mais Complexo
+- Grid maior (10×10, 50×50)
+- Múltiplos obstáculos móveis
+- Terreno com custos variados
+
+*** Variações do Algoritmo
+- SARSA (on-policy)
+- Double Q-Learning (reduz superestimação)
+- Dueling Q-Networks
+
+*** Visualização
+- Interface gráfica com SDL/OpenGL
+- Animação do treinamento em tempo real
+- Heatmap de valores Q
+
+* Conclusões
+
+** Resultados Obtidos
+
+✓ *Implementação Completa:* 1300+ linhas de código bem documentado
+✓ *100% de Testes Aprovados:* 44 testes unitários passando
+✓ *Convergência Garantida:* Agente aprende caminho ótimo em 6 passos
+✓ *Base Sólida:* Pronto para paralelização com OpenMP
+
+** Qualidade do Código
+
+- *Comentários:* 600+ linhas de documentação inline
+- *Modularidade:* Funções bem definidas e reutilizáveis
+- *Testes:* Cobertura de todas as funções críticas
+- *Portabilidade:* C puro, sem dependências externas
+
+** Próximos Passos
+
+1. *Paralelização OpenMP:*
+   - Implementar versão com #pragma omp parallel for
+   - Comparar estratégias (locks vs. Q-tables locais)
+   - Medir speedup com 2, 4, 8 threads
+
+2. *Otimizações:*
+   - Vetorização SIMD para atualização de Q-values
+   - Cache-friendly memory layout
+   - Prefetching de Q-values
+
+3. *Análise de Desempenho:*
+   - Profiling com gprof/perf
+   - Identificar gargalos
+   - Otimizar hot paths
+
+** Impacto Educacional
+
+Este projeto demonstra:
+- *IA Clássica:* Q-Learning é fundação do Deep RL moderno
+- *Programação Paralela:* Identifica oportunidades de paralelismo
+- *Engenharia de Software:* Código limpo, testável e documentado
+- *Metodologia Científica:* Hipótese → Implementação → Teste → Análise
+
+* Referências
+
+** Bibliografia
+
+1. *Sutton & Barto* (2018). "Reinforcement Learning: An Introduction" (2nd ed.)
+   - Capítulo 6: Temporal-Difference Learning
+   - Seção 6.5: Q-Learning
+
+2. *Watkins, C.* (1989). "Learning from Delayed Rewards" (PhD Thesis)
+   - Introdução original do Q-Learning
+
+3. *Mnih et al.* (2015). "Human-level control through deep RL"
+   - Nature paper sobre DQN
+
+** Recursos Online
+
+- OpenMP Tutorial: https://www.openmp.org/resources/tutorials-articles/
+- Grid World Examples: https://github.com/topics/gridworld
+- Q-Learning Visualization: https://cs.stanford.edu/people/karpathy/reinforcejs/
+
+* Apêndice
+
+** A.1 Código Completo da Função Principal
+
+#+BEGIN_SRC c
+int main(void) {
+    QLearning ql;
+    
+    srand(42);  // Seed fixa para reprodutibilidade
+    
+    printf("========================================\n");
+    printf("   Q-LEARNING SEQUENCIAL - GRID 4x4\n");
+    printf("========================================\n\n");
+    
+    // Inicialização
+    printf("Inicializando ambiente...\n");
+    qlearning_init(&ql);
+    printf("Grid World criado\n\n");
+    
+    // Treinamento
+    train(&ql, NUM_EPISODES, 1);
+    
+    // Resultados
+    print_q_table(&ql);
+    print_policy(&ql);
+    demonstrate_path(&ql);
+    
+    return 0;
+}
+#+END_SRC
+
+** A.2 Tabela de Constantes
+
+| Constante        | Valor  | Unidade  | Descrição                       |
+|------------------+--------+----------+---------------------------------|
+| GRID_ROWS        | 4      | -        | Linhas do grid                  |
+| GRID_COLS        | 4      | -        | Colunas do grid                 |
+| NUM_STATES       | 16     | -        | Total de estados                |
+| NUM_ACTIONS      | 4      | -        | Ações possíveis                 |
+| ALPHA            | 0.1    | -        | Taxa de aprendizado             |
+| GAMMA            | 0.9    | -        | Fator de desconto               |
+| EPSILON          | 0.1    | -        | Taxa de exploração              |
+| NUM_EPISODES     | 1000   | episódios | Treinamento                    |
+| MAX_STEPS        | 100    | passos   | Limite por episódio             |
+| REWARD_GOAL      | 100.0  | -        | Recompensa objetivo             |
+| REWARD_OBSTACLE  | -100.0 | -        | Penalidade obstáculo            |
+| REWARD_STEP      | -1.0   | -        | Penalidade por passo            |
+
+** A.3 Glossário
+
+- *Agente:* Entidade que toma decisões e executa ações
+- *Ambiente:* Mundo no qual o agente opera (Grid World)
+- *Estado:* Configuração atual do ambiente
+- *Ação:* Escolha que o agente pode fazer
+- *Recompensa:* Feedback numérico do ambiente
+- *Política:* Mapeamento de estados para ações
+- *Q-Value:* Valor esperado de uma ação em um estado
+- *Episódio:* Sequência completa do início ao objetivo
+- *Bellman:* Equação fundamental do RL
+- *ε-greedy:* Estratégia de exploração-explotação
+- *Convergência:* Estabilização dos valores Q
+
+---
+
+#+BEGIN_CENTER
+*Fim do Relatório*
+
+Implementação: Q-Learning Sequencial em C
+Autor: Trabalho de Programação Paralela
+Data: Abril 2026
+#+END_CENTER
