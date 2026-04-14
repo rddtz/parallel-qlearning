@@ -51,6 +51,8 @@
 #include <time.h>
 #include <math.h>
 
+#include <omp.h>
+
 /* =============================================================================
  * DEFINIÇÕES E CONSTANTES
  * =============================================================================
@@ -159,6 +161,7 @@ void qlearning_init(QLearning *ql) {
     
     /* Inicializa Q-table com zeros */
     /* Todos os pares (estado, ação) começam com valor 0 */
+    #pragma omp parallel for
     for (i = 0; i < NUM_STATES; i++) {
         for (j = 0; j < NUM_ACTIONS; j++) {
             ql->q_table[i][j] = 0.0;
@@ -167,6 +170,7 @@ void qlearning_init(QLearning *ql) {
     
     /* Inicializa o grid */
     /* 0 = célula livre, 1 = obstáculo, 2 = objetivo */
+    #pragma omp parallel for
     for (i = 0; i < GRID_ROWS; i++) {
         for (j = 0; j < GRID_COLS; j++) {
             ql->grid[i][j] = 0;  /* Todas as células iniciam livres */
@@ -264,7 +268,7 @@ int is_terminal_state(int state) {
  * - Com probabilidade ε: escolhe ação ALEATÓRIA (exploração)
  *   Isso permite descobrir novos caminhos
  * - Com probabilidade (1-ε): escolhe MELHOR ação conhecida (explotação)
- *   Isso usa o conhecimento já adquirido
+ *   Isso usa o conhecimento já adquirido    
  */
 int select_action(QLearning *ql, int state) {
     int action, best_action;
@@ -280,6 +284,7 @@ int select_action(QLearning *ql, int state) {
     best_action = 0;
     best_value = ql->q_table[state][0];
     
+    #pragma omp parallel for
     for (action = 1; action < NUM_ACTIONS; action++) {
         if (ql->q_table[state][action] > best_value) {
             best_value = ql->q_table[state][action];
