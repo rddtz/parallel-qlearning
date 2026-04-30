@@ -736,16 +736,53 @@ int select_action(QLearning *ql, int state) {
         return random_int(NUM_ACTIONS);
     }
     
+    ///* Caso contrário, explota (melhor ação conhecida) */
+    //best_action = 0;
+    //best_value = ql->q_table[state][0];
+    //
+    //for (action = 1; action < NUM_ACTIONS; action++) {
+    //    if (ql->q_table[state][action] > best_value) {
+    //        best_value = ql->q_table[state][action];
+    //        best_action = action;
+    //    }
+    //}
+
     /* Caso contrário, explota (melhor ação conhecida) */
+    /* Encontra a ação com maior valor Q para o estado atual */
     best_action = 0;
     best_value = ql->q_table[state][0];
     
-    for (action = 1; action < NUM_ACTIONS; action++) {
-        if (ql->q_table[state][action] > best_value) {
-            best_value = ql->q_table[state][action];
-            best_action = action;
+    /*
+    Possui duas regiões críticas: best_value e best_action.
+    Foi criado duas variáveis locais local_best_value e local_best_action onde
+    cada thread terá o seu melhor valor local e melhor ação local. No final, atualiza a região crítica.
+    */
+    #pragma omp parallel
+    {
+
+        double local_best_value = ql->q_table[state][0];
+        int local_best_action = 0;
+
+        // Usa-se o nowait para evitar a sincronização de threads depois do loop.
+        // Faz com que as threads possam atualizar de forma segura o melhor valor globa e o melhor ação global
+        #pragma omp for nowait
+        for (action = 1; action < NUM_ACTIONS; action++) {
+            if (ql->q_table[state][action] > best_value) {
+                best_value = ql->q_table[state][action];
+                best_action = action;
+            }
         }
+
+        #pragma omp critical
+        {
+            if(local_best_value > best_value){
+                    best_value = local_best_value;
+                    best_action = local_best_action;
+            }
+        }
+
     }
+
     
     return best_action;
 }

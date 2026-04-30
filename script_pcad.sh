@@ -9,9 +9,7 @@
 
 source /home/intel/oneapi/vtune/2021.1.1/vtune-vars.sh
 
-module load gcc
-
-gcc -03 -g qlearning_cli.c -o qlearning_cli -fopenmp
+gcc -O3 -g qlearning_cli.c -o qlearning_cli -fopenmp
 
 # mode: normal, hard, extreme
 for mode in normal hard extreme; do
@@ -20,9 +18,8 @@ for mode in normal hard extreme; do
         export OMP_NUM_THREADS=${threads}
         
         vtune -collect performance-snapshot \
-            -result-dir "vtune_results_${mode}_${threads}" z
-            -quiet \
-            -- ./qlearning_cli --mode "${mode}" >/dev/null
+            -result-dir "vtune_results_${mode}_${threads}" \
+            -- ./qlearning_cli --mode "${mode}"
         echo
     done
 done
