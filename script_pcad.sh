@@ -9,19 +9,29 @@
 
 source /home/intel/oneapi/vtune/2021.1.1/vtune-vars.sh
 
-gcc -O3 -g qlearning_cli.c -o qlearning_cli -fopenmp -lm
+gcc -g qlearning_cli.c -o qlearning_cli -fopenmp -lm
 
 # mode: normal, hard, extreme
-for mode in normal hard extreme; do
-    for threads in 1 2 4 8 16 32 40; do
-        echo "=== mode: ${mode} ${threads}==="
-        export OMP_NUM_THREADS=${threads}
-        
-        vtune -collect performance-snapshot \
-            -result-dir "vtune_results_${mode}_${threads}" \
-            -- ./qlearning_cli --mode "${mode}"
-        echo
-    done
+#for mode in normal hard extreme; do
+#    for threads in 1 2 4 8 16 32 40; do
+#        echo "=== mode: ${mode} ${threads}==="
+#        export OMP_NUM_THREADS=${threads}
+#        
+#        vtune -collect performance-snapshot \
+#            -result-dir "vtune_results_${mode}_${threads}" \
+#            -- ./qlearning_cli --mode "${mode}"
+#        echo
+#    done
+#done
+
+for threads in 1 2 4 8 16 32 40; do
+    echo "=== mode: ${mode} ${threads}==="
+    export OMP_NUM_THREADS=${threads}
+    
+    vtune -collect performance-snapshot \
+        -result-dir "vtune_results_${mode}" \
+        -- ./qlearning_cli --mode "${mode}" --gridx 50 --gridy 50
+    echo
 done
 
 
