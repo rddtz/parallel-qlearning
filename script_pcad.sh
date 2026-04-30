@@ -9,7 +9,7 @@
 
 source /home/intel/oneapi/vtune/2021.1.1/vtune-vars.sh
 
-gcc -O3 -g qlearning_cli.c -o qlearning_cli -fopenmp
+gcc -O3 -g qlearning_cli.c -o qlearning_cli -fopenmp -lm
 
 # mode: normal, hard, extreme
 for mode in normal hard extreme; do

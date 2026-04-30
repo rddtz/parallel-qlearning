@@ -48,6 +48,7 @@
 #include <time.h>
 #include <math.h>
 #include <getopt.h>
+#include <omp.h>
 
 /* =============================================================================
  * CONSTANTES FIXAS
@@ -848,27 +849,103 @@ double run_episode(QLearning *ql, int episode_num) {
  */
 void train(QLearning *ql) {
     Config *cfg = ql->config;
-    int episode;
+    int episode, t, state, action;
     double total_reward;
-    double avg_reward = 0.0;
+    int num_threads;
+    QLearning *local_ql_array = NULL;
+    double ***local_q_tables = NULL;
     
     if (!cfg->quiet) {
         printf("\nIniciando treinamento com %d episodios...\n", cfg->num_episodes);
-        printf("Hiperparametros: alpha=%.2f, gamma=%.2f, epsilon=%.2f\n\n", 
+        printf("Hiperparametros: alpha=%.2f, gamma=%.2f, epsilon=%.2f\n", 
                cfg->alpha, cfg->gamma, cfg->epsilon);
     }
     
-    for (episode = 0; episode < cfg->num_episodes; episode++) {
-        total_reward = run_episode(ql, episode);
-        avg_reward += total_reward;
-        
-        /* Imprime progresso a cada 100 episódios */
-        if (cfg->verbose && !cfg->step_by_step && (episode + 1) % 100 == 0) {
-            printf("Episodio %5d | Recompensa media (ultimos 100): %.2f\n",
-                   episode + 1, avg_reward / 100.0);
-            avg_reward = 0.0;
+    /* Determina número de threads */
+    #pragma omp parallel
+    {
+        #pragma omp single
+        num_threads = omp_get_num_threads();
+    }
+    
+    if (!cfg->quiet) {
+        printf("Threads OpenMP: %d\n\n", num_threads);
+    }
+    
+    /* Aloca estruturas para cada thread */
+    local_ql_array = (QLearning *)malloc(num_threads * sizeof(QLearning));
+    local_q_tables = (double ***)malloc(num_threads * sizeof(double **));
+    
+    if (!local_ql_array || !local_q_tables) {
+        fprintf(stderr, "Erro: Falha ao alocar memoria para threads\n");
+        return;
+    }
+    
+    /* Aloca Q-tables locais para cada thread */
+    for (t = 0; t < num_threads; t++) {
+        local_q_tables[t] = (double **)malloc(ql->num_states * sizeof(double *));
+        for (state = 0; state < ql->num_states; state++) {
+            local_q_tables[t][state] = (double *)calloc(NUM_ACTIONS, sizeof(double));
         }
     }
+    
+    /* Executa treinamento paralelo */
+    #pragma omp parallel private(episode, total_reward, t, state, action)
+    {
+        int tid = omp_get_thread_num();
+        QLearning local_ql = *ql;  /* Cópia da estrutura */
+        local_ql.q_table = local_q_tables[tid];  /* Aponta para Q-table local */
+        
+        /* Copia Q-table inicial para cada thread */
+        #pragma omp for collapse(2) nowait
+        for (state = 0; state < ql->num_states; state++) {
+            for (action = 0; action < NUM_ACTIONS; action++) {
+                local_ql.q_table[state][action] = ql->q_table[state][action];
+            }
+        }
+        #pragma omp barrier
+        
+        /* Cada thread roda seus episódios */
+        #pragma omp for
+        for (episode = 0; episode < cfg->num_episodes; episode++) {
+            total_reward = run_episode(&local_ql, episode);
+            
+            /* Imprime progresso (apenas thread 0) */
+            if (tid == 0 && cfg->verbose && !cfg->step_by_step && (episode + 1) % 100 == 0) {
+                #pragma omp critical
+                {
+                    printf("Episodio %5d | Thread: %d/%d\n",
+                           episode + 1, tid, num_threads);
+                }
+            }
+        }
+    }
+    
+    /* Merge: calcula média das Q-tables */
+    if (!cfg->quiet) {
+        printf("\nMerge das Q-tables...\n");
+    }
+    
+    #pragma omp parallel for collapse(2)
+    for (state = 0; state < ql->num_states; state++) {
+        for (action = 0; action < NUM_ACTIONS; action++) {
+            double sum = 0.0;
+            for (t = 0; t < num_threads; t++) {
+                sum += local_q_tables[t][state][action];
+            }
+            ql->q_table[state][action] = sum / num_threads;
+        }
+    }
+    
+    /* Libera memória */
+    for (t = 0; t < num_threads; t++) {
+        for (state = 0; state < ql->num_states; state++) {
+            free(local_q_tables[t][state]);
+        }
+        free(local_q_tables[t]);
+    }
+    free(local_q_tables);
+    free(local_ql_array);
     
     if (!cfg->quiet) {
         printf("\nTreinamento concluido!\n");
