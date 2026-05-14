@@ -749,7 +749,7 @@ Guia detalhado em Org Mode sobre:
 - Efeito de cada hiperparâmetro
 - Exemplos práticos
 - Casos de uso
-
+  
 ** 3. README_PARAMETROS.md
 Referência rápida em Markdown:
 - Lista de parâmetros
