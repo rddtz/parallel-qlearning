@@ -1,8 +1,12 @@
 #+STARTUP: content
 #+STARTUP: overview
 #+STARTUP: indent
-#+OPTIONS: toc:t
 #+TITLE: OMP QLearning LabBook
+
+* Table of Contents :toc:
+- [[#implementation][Implementation]]
+- [[#configuration][Configuration]]
+- [[#experimental-project][Experimental Project]]
 
 * Implementation
 
