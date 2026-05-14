@@ -1,6 +1,7 @@
 #+STARTUP: content
 #+STARTUP: overview
 #+STARTUP: indent
+#+OPTIONS: toc:t
 #+TITLE: OMP QLearning LabBook
 
 * Implementation
