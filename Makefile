@@ -1,12 +1,10 @@
 # =============================================================================
-# MAKEFILE - Q-LEARNING SEQUENCIAL
+# MAKEFILE - Q-LEARNING
 # =============================================================================
-# 
+#
 # Comandos disponíveis:
 #   make all        - Compila todos os programas
 #   make cli        - Compila versão com linha de comando (recomendado!)
-#   make sequential - Compila versão antiga (parâmetros fixos)
-#   make test       - Compila e executa os testes
 #   make run        - Executa versão CLI no modo normal
 #   make run-easy   - Executa versão CLI no modo fácil
 #   make run-hard   - Executa versão CLI no modo difícil
@@ -23,28 +21,16 @@ LDFLAGS = -lm
 
 # Arquivos executáveis
 CLI = qlearning
-SEQUENTIAL = qlearning_sequential
-TEST = test_qlearning
 TEST_CLI = test_qlearning_cli
 
 # Regra padrão: compila tudo
-all: $(CLI) $(SEQUENTIAL) $(TEST) $(TEST_CLI)
+all: $(CLI) $(TEST) $(TEST_CLI)
 
 # Compila versão CLI (recomendado!)
 $(CLI): qlearning_cli.c
 	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS)
 
 cli: $(CLI)
-
-# Compila o programa sequencial (versão antiga)
-$(SEQUENTIAL): qlearning_sequential.c
-	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS)
-
-sequential: $(SEQUENTIAL)
-
-# Compila os testes (versão original)
-$(TEST): test_qlearning.c
-	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS)
 
 # Compila os testes (versão CLI dinâmica)
 $(TEST_CLI): test_qlearning_cli.c
@@ -84,25 +70,13 @@ demo: $(CLI)
 help: $(CLI)
 	./$(CLI) --help
 
-# Compila e executa os testes (versão original)
-test: $(TEST)
-	./$(TEST)
-
 # Compila e executa os testes CLI
 test-cli: $(TEST_CLI)
 	./$(TEST_CLI)
 
-# Executa todos os testes
-test-all: $(TEST) $(TEST_CLI)
-	@echo "===== Executando testes da versão original ====="
-	./$(TEST)
-	@echo ""
-	@echo "===== Executando testes da versão CLI ====="
-	./$(TEST_CLI)
-
 # Limpa arquivos compilados
 clean:
-	rm -f $(CLI) $(SEQUENTIAL) $(TEST) $(TEST_CLI)
+	rm -f $(CLI) $(TEST) $(TEST_CLI)
 
 # Marca alvos que não são arquivos
-.PHONY: all cli sequential run run-easy run-hard run-extreme demo help test test-cli test-all clean
+.PHONY: all cli run run-easy run-hard run-extreme demo help test-cli test-all clean
