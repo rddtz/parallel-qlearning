@@ -3,6 +3,408 @@
 #+STARTUP: indent
 #+TITLE: OMP QLearning LabBook
 
+* Implementation
+
+Principais trechos de código e estruturas de dados da implementação. 
+ 
+** Estruturas de Dados
+*** Config — Parâmetros de Configuração
+
+Centraliza todos os parâmetros configuráveis do programa em uma única estrutura.
+Os três hiperparâmetros fundamentais do Q-Learning (~alpha~, ~gamma~, ~epsilon~)
+ficam aqui, junto com as dimensões do grid, as recompensas de cada tipo de
+transição e as flags de controle de saída. Essa separação facilita passar a
+configuração inteira entre funções sem listas de parâmetros gigantes.
+
+#+begin_src c
+  typedef struct {
+    int grid_rows;
+    int grid_cols;
+   
+    double alpha;           /* Taxa de aprendizado */
+    double gamma;           /* Fator de desconto */
+    double epsilon;         /* Taxa de exploração */
+   
+    int num_episodes;
+    int max_steps;
+    int num_obstacles;
+    unsigned int seed;
+   
+    double reward_goal;
+    double reward_obstacle;
+    double reward_step;
+   
+    int verbose;
+    int step_by_step;
+    int quiet;
+    int show_table;
+    int show_policy;
+   
+    char mode[20];
+  } Config;
+#+end_src
+ 
+*** QLearning — Estado do Agente 
+
+Agrupa o estado completo do agente e do ambiente. A ~q_table~ é alocada
+dinamicamente como uma matriz ~[num_states][NUM_ACTIONS]~, onde cada entrada
+~Q(s, a)~ representa o valor esperado de executar a ação ~a~ no estado ~s~. O
+campo ~config~ é um ponteiro para a configuração, evitando duplicação de dados.
+
+#+begin_src c
+  typedef struct {
+    double **q_table;
+    int **grid;
+    int *obstacles;
+    int num_obstacles;
+    int goal_state;
+    int start_state;
+    int num_states;
+    Config *config;
+  } QLearning;
+#+end_src
+ 
+** Configuração e Modos Predefinidos
+*** config_apply_mode — Modos de Dificuldade
+
+Define conjuntos coerentes de hiperparâmetros para cada nível de dificuldade.
+Nos modos mais difíceis, o ~alpha~ (taxa de aprendizado) é menor — o agente
+aprende mais devagar, mas de forma mais estável em espaços maiores. O ~gamma~
+(desconto futuro) aumenta, fazendo o agente valorizar mais recompensas distantes.
+O ~epsilon~ cai, reduzindo a exploração aleatória conforme o espaço cresce.
+
+ 
+#+begin_src c
+  void config_apply_mode(Config *cfg, const char *mode) {
+    if (strcmp(mode, "easy") == 0) {
+      cfg->grid_rows = 3;  cfg->grid_cols = 3;
+      cfg->alpha = 0.2;    cfg->gamma = 0.8;   cfg->epsilon = 0.15;
+      cfg->num_episodes = 300;  cfg->num_obstacles = 1;
+    }
+    else if (strcmp(mode, "hard") == 0) {
+      cfg->grid_rows = 6;  cfg->grid_cols = 6;
+      cfg->alpha = 0.08;   cfg->gamma = 0.92;  cfg->epsilon = 0.08;
+      cfg->num_episodes = 3000; cfg->num_obstacles = 4;
+    }
+    else if (strcmp(mode, "extreme") == 0) {
+      cfg->grid_rows = 10; cfg->grid_cols = 10;
+      cfg->alpha = 0.05;   cfg->gamma = 0.95;  cfg->epsilon = 0.05;
+      cfg->num_episodes = 5000; cfg->num_obstacles = 15;
+    }
+    /* ... outros modos */
+  }
+#+end_src
+ 
+** Parsing de Argumentos
+*** parse_arguments — Duas Passagens 
+Usa duas passagens sobre os argumentos deliberadamente: a primeira detecta
+~--mode~ e aplica os valores padrão do modo; a segunda processa todos os demais
+argumentos, que sobrescrevem individualmente qualquer valor do modo. Isso garante
+que ~--mode hard --alpha 0.5~ funcione corretamente — o modo é aplicado primeiro
+e o ~alpha~ é então substituído.
+ 
+#+begin_src c
+  int parse_arguments(int argc, char *argv[], Config *cfg) {
+    /* Primeira passagem: procura --mode para aplicar primeiro */
+    for (int i = 1; i < argc; i++) {
+      if (strcmp(argv[i], "--mode") == 0 && i + 1 < argc) {
+        config_apply_mode(cfg, argv[i + 1]);
+        mode_set = 1;
+        break;
+      }
+    }
+   
+    /* Segunda passagem: processa todos os argumentos (sobrescrevem o modo) */
+    optind = 1;
+    while ((opt = getopt_long(argc, argv, "m:x:y:...", long_options, &option_index)) != -1) {
+      switch (opt) {
+      case 'x': cfg->grid_cols = atoi(optarg); break;
+      case 'a': cfg->alpha     = atof(optarg); break;
+        /* ... demais opções */
+      }
+    }
+  }
+#+end_src
+
+** Representação do Grid
+*** coords_to_state / state_to_coords — Mapeamento 2D→1D
+ 
+#+begin_src c
+  int coords_to_state(Config *cfg, int row, int col) {
+    return row * cfg->grid_cols + col;
+  }
+   
+  void state_to_coords(Config *cfg, int state, int *row, int *col) {
+    ,*row = state / cfg->grid_cols;
+    ,*col = state % cfg->grid_cols;
+  }
+#+end_src
+ 
+Convertem entre a representação visual bidimensional (linha, coluna) e o índice
+linear usado pela Q-table. A fórmula ~row * cols + col~ é o mapeamento
+row-major padrão. Essas duas funções são chamadas em praticamente todo o código
+que precisa transitar entre a lógica de navegação e o armazenamento interno.
+ 
+** Alocação de Memória
+*** qlearning_alloc — Alocação Dinâmica da Q-Table
+Realiza alocação dinâmica de tudo que depende do tamanho do grid, o qual é
+conhecido apenas em tempo de execução. O uso de ~calloc~ em vez de ~malloc~ para
+a Q-table e o grid garante que todos os valores comecem em zero sem necessidade
+de um laço de inicialização separado.
+ 
+#+begin_src c
+  int qlearning_alloc(QLearning *ql, Config *cfg) {
+    int num_states = cfg->grid_rows * cfg->grid_cols;
+   
+    /* Aloca vetor de ponteiros (linhas da Q-table) */
+    ql->q_table = (double **)malloc(num_states * sizeof(double *));
+   
+    /* Aloca cada linha com calloc (inicializa zeros automaticamente) */
+    for (i = 0; i < num_states; i++) {
+      ql->q_table[i] = (double *)calloc(NUM_ACTIONS, sizeof(double));
+    }
+   
+    /* Aloca o grid bidimensional da mesma forma */
+    ql->grid = (int **)malloc(cfg->grid_rows * sizeof(int *));
+    for (i = 0; i < cfg->grid_rows; i++) {
+      ql->grid[i] = (int *)calloc(cfg->grid_cols, sizeof(int));
+    }
+   
+    ql->obstacles = (int *)malloc(MAX_OBSTACLES * sizeof(int));
+    return 0;
+  }
+#+end_src
+ 
+** Inicialização do Ambiente
+*** generate_random_obstacles — Geração com Restrições (linhas 574–601)
+Gera obstáculos aleatoriamente com um laço de tentativas limitado para evitar
+loop infinito. A função ~is_valid_obstacle_position~ impede que obstáculos sejam
+colocados no estado inicial, no objetivo, ou em posições já ocupadas. O limite
+de tentativas (~num_states * 10~) é uma heurística conservadora: se o grid
+estiver muito cheio, o laço para e avisa ao usuário quantos obstáculos foram
+realmente colocados. 
+#+begin_src c
+  void generate_random_obstacles(QLearning *ql) {
+    int placed = 0;
+    int max_attempts = cfg->grid_rows * cfg->grid_cols * 10;
+   
+    while (placed < cfg->num_obstacles && attempts < max_attempts) {
+      int state = random_int(ql->num_states);
+   
+      if (is_valid_obstacle_position(ql, state)) {
+        ql->obstacles[placed] = state;
+        ql->grid[row][col] = CELL_OBSTACLE;
+        placed++;
+      }
+      attempts++;
+    }
+  }
+#+end_src
+ 
+** Núcleo do Q-Learning
+*** select_action — Política ε-greedy
+Implementa a política ε-greedy, central ao equilíbrio entre exploração e
+explotação. Com probabilidade ~epsilon~, o agente age aleatoriamente —
+explorando estados que pode não conhecer bem. Com probabilidade ~1 - epsilon~,
+escolhe a ação com maior valor Q conhecido. Sem exploração, o agente ficaria
+preso na primeira política boa que encontrar; sem explotação, nunca convergiria. 
+#+begin_src c
+  int select_action(QLearning *ql, int state) {
+    /* Com probabilidade ε, explora (ação aleatória) */
+    if (random_double() < cfg->epsilon) {
+      return random_int(NUM_ACTIONS);
+    }
+   
+    /* Caso contrário, explota (melhor ação conhecida) */
+    best_action = 0;
+    best_value = ql->q_table[state][0];
+    for (action = 1; action < NUM_ACTIONS; action++) {
+      if (ql->q_table[state][action] > best_value) {
+        best_value = ql->q_table[state][action];
+        best_action = action;
+      }
+    }
+    return best_action;
+  }
+#+end_src
+ 
+*** update_q_value — Equação de Bellman
+O termo entre colchetes é o *erro TD* (diferença temporal): a diferença entre o
+retorno estimado atual e o novo estimado com a recompensa observada. O ~alpha~
+controla o quanto cada atualização move o valor antigo em direção ao novo. Com
+~gamma~ próximo de 1, recompensas futuras têm peso quase igual às imediatas. 
+#+begin_src c
+  void update_q_value(QLearning *ql, int state, int action,
+                      double reward, int next_state) {
+    double current_q  = ql->q_table[state][action];
+    double max_next_q = get_max_q_value(ql, next_state);
+   
+    ql->q_table[state][action] = current_q +
+      cfg->alpha * (reward + cfg->gamma * max_next_q - current_q);
+  }
+#+end_src
+ 
+Este é o coração do algoritmo. A fórmula implementa a atualização de Bellman:
+ 
+: Q(s, a) ← Q(s, a) + α · [r + γ · max_a' Q(s', a') − Q(s, a)]
+ 
+*** run_episode — Loop de um Episódio
+Executa o ciclo completo de um episódio: o agente parte do estado inicial e
+repete o ciclo ~observar → agir → receber recompensa → atualizar Q → avançar~
+até atingir o objetivo ou esgotar ~max_steps~. Cada chamada a ~update_q_value~
+refina gradualmente a Q-table com base na experiência daquele passo. 
+#+begin_src c
+  double run_episode(QLearning *ql, int episode_num) {
+    state = ql->start_state;
+   
+    for (step = 0; step < cfg->max_steps; step++) {
+      action     = select_action(ql, state);
+      next_state = get_next_state(ql, state, action);
+      reward     = get_reward(ql, next_state);
+   
+      update_q_value(ql, state, action, reward, next_state);
+      total_reward += reward;
+   
+      if (is_terminal_state(ql, next_state)) break;
+   
+      state = next_state;
+    }
+    return total_reward;
+  }
+#+end_src
+ 
+*** train — Loop de Treinamento 
+Orquestra o treinamento repetindo ~run_episode~ pelo número configurado de
+episódios. A recompensa média a cada 100 episódios serve como métrica de
+convergência: se os valores forem crescendo ao longo do tempo, o agente está
+aprendendo uma política melhor. Quando a recompensa estabiliza em um valor alto,
+o algoritmo convergiu.
+#+begin_src c
+  void train(QLearning *ql) {
+    for (episode = 0; episode < cfg->num_episodes; episode++) {
+      total_reward = run_episode(ql, episode);
+      avg_reward  += total_reward;
+   
+      if (cfg->verbose && (episode + 1) % 100 == 0) {
+        printf("Episodio %5d | Recompensa media (ultimos 100): %.2f\n",
+  	     episode + 1, avg_reward / 100.0);
+        avg_reward = 0.0;
+      }
+    }
+  }
+#+end_src
+
+** Visualização dos Resultados
+*** print_policy — Política Aprendida no Grid (linhas 945–984)
+Transforma a Q-table abstrata em uma representação visual intuitiva. Para cada
+célula livre, determina a ação de maior valor Q e exibe o símbolo direcional
+correspondente (~^~, ~v~, ~<~, ~>~). O resultado é um mapa que mostra
+graficamente para onde o agente aprendeu a ir em cada posição do grid.
+#+begin_src c
+  void print_policy(QLearning *ql) {
+    char symbols[4] = {'^', 'v', '<', '>'};
+   
+    for (row = 0; row < cfg->grid_rows; row++) {
+      for (col = 0; col < cfg->grid_cols; col++) {
+        state = coords_to_state(cfg, row, col);
+   
+        if (state == ql->goal_state)       printf("| G ");
+        else if (is_obstacle(ql, state))   printf("| X ");
+        else {
+  	/* Encontra a ação com maior Q neste estado */
+  	best_action = 0;
+  	best_value  = ql->q_table[state][0];
+  	for (action = 1; action < NUM_ACTIONS; action++) {
+  	  if (ql->q_table[state][action] > best_value) {
+  	    best_value  = ql->q_table[state][action];
+  	    best_action = action;
+  	  }
+  	}
+  	printf("| %c ", symbols[best_action]);
+        }
+      }
+    }
+  }
+#+end_src
+ 
+
+*** demonstrate_path — Simulação Pós-Treinamento (linhas 1006–1035)
+Executa o agente treinado em modo puramente guloso (sem exploração), seguindo
+sempre a melhor ação conhecida em cada estado. Serve como validação qualitativa:
+se o treinamento convergiu, o agente deve alcançar o objetivo em poucos passos;
+caso contrário, indica que o algoritmo precisaria de mais episódios ou ajuste
+nos hiperparâmetros. 
+#+begin_src c
+  void demonstrate_path(QLearning *ql) {
+    int state = ql->start_state;
+   
+    while (state != ql->goal_state && step < cfg->max_steps) {
+      action = get_best_action(ql, state);
+      printf("Passo %2d: Estado (%d,%d) -> Acao: %s\n",
+  	   step + 1, row, col, action_to_string(action));
+      state = get_next_state(ql, state, action);
+      step++;
+    }
+   
+    if (state == ql->goal_state)
+      printf("Agente encontrou o caminho em %d passos.\n", step);
+  }
+#+end_src
+ 
+
+** Fluxo Principal
+*** main — Sequência de Execução
+A função ~main~ segue um pipeline linear bem definido em dez etapas: configurar,
+alocar, inicializar, treinar e exibir resultados. Cada etapa é encapsulada em
+sua própria função, tornando o fluxo legível sem expor detalhes internos.
+A liberação de memória em ~qlearning_free~ espelha exatamente a alocação feita
+em ~qlearning_alloc~, percorrendo as mesmas estruturas em sentido inverso.
+ 
+#+begin_src c
+  int main(int argc, char *argv[]) {
+    config_set_defaults(&cfg);      /* 1. Valores padrão */
+    parse_arguments(argc, argv, &cfg); /* 2. Argumentos CLI */
+   
+    qlearning_alloc(&ql, &cfg);    /* 3. Aloca memória */
+    qlearning_init(&ql);           /* 4. Inicializa ambiente */
+   
+    print_grid(&ql);               /* 5. Exibe grid inicial */
+    train(&ql);                    /* 6. Treina o agente */
+   
+    print_q_table(&ql);            /* 7. Exibe Q-table final */
+    print_policy(&ql);             /* 8. Exibe política aprendida */
+    demonstrate_path(&ql);         /* 9. Demonstra caminho */
+   
+    qlearning_free(&ql);           /* 10. Libera memória */
+    return 0;
+  }
+#+end_src
+ 
+* Configuration
+** Parameters
+--alpha F           Taxa de aprendizado (0.0 a 1.0)
+--gamma F           Fator de desconto (0.0 a 1.0)
+--epsilon F         Taxa de exploração (0.0 a 1.0)
+
+** Modes
+--mode easy      Grid 3x3, poucos obstáculos, aprendizado rápido
+--mode normal    Grid 4x4, configuração balanceada (padrão)
+--mode hard      Grid 6x6, mais obstáculos, mais episódios
+--mode extreme   Grid 10x10, muitos obstáculos, desafiador
+
+** Options
+--gridx N           Largura do grid (colunas)
+--gridy N           Altura do grid (linhas)
+--obstacles N       Número de obstáculos aleatórios
+--seed N            Seed para geração aleatória (reprodutibilidade)
+--episodes N        Número de episódios de treinamento
+--maxsteps N        Máximo de passos por episódio
+--verbose           Mostra progresso detalhado a cada episódio
+--step              Mostra cada passo do treinamento (muito detalhado!)
+--quiet             Modo silencioso (apenas resultado final)
+--no-table          Não mostra a Q-table
+--no-policy         Não mostra a política visual
+--help              Mostra esta ajuda
 
 * Experimental Project
 
@@ -16,7 +418,7 @@
 
   grid_size  = [5, 10, 20, 100] # NxN grids size
   threads    = [1, 2, 5, 10, 20, 40] # 1..20 to test only with physical cores, 40 to test with logical threads
-                                     # Remember to set correct OpenMP flags to alloc to right cores.
+  # Remember to set correct OpenMP flags to alloc to right cores.
   episodes = [100, 1000] # needed?
   obstacles = [1, 5, 20] # needed?
   #There is more factors? There is need to change alpha, gamma and things like that?
