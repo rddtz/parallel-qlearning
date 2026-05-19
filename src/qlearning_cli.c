@@ -54,11 +54,7 @@
  * =============================================================================
  */
 
-/* Limites do sistema */
-#define MAX_GRID_SIZE 50         /* Tamanho máximo do grid */
-#define MAX_STATES (MAX_GRID_SIZE * MAX_GRID_SIZE)
-#define NUM_ACTIONS 4            /* Ações: cima, baixo, esquerda, direita */
-#define MAX_OBSTACLES 100        /* Máximo de obstáculos */
+#define NUM_ACTIONS 4
 
 /* Identificadores das ações */
 #define ACTION_UP    0
@@ -336,22 +332,22 @@ int parse_arguments(int argc, char *argv[], Config *cfg) {
                 break;
             case 'x':
                 cfg->grid_cols = atoi(optarg);
-                if (cfg->grid_cols < 2 || cfg->grid_cols > MAX_GRID_SIZE) {
-                    fprintf(stderr, "Erro: gridx deve estar entre 2 e %d\n", MAX_GRID_SIZE);
+                if (cfg->grid_cols < 2) {
+                    fprintf(stderr, "Erro: gridx deve ser pelo menos 2\n");
                     return -1;
                 }
                 break;
             case 'y':
                 cfg->grid_rows = atoi(optarg);
-                if (cfg->grid_rows < 2 || cfg->grid_rows > MAX_GRID_SIZE) {
-                    fprintf(stderr, "Erro: gridy deve estar entre 2 e %d\n", MAX_GRID_SIZE);
+                if (cfg->grid_rows < 2) {
+                    fprintf(stderr, "Erro: gridy deve ser pelo menos 2\n");
                     return -1;
                 }
                 break;
             case 'o':
                 cfg->num_obstacles = atoi(optarg);
-                if (cfg->num_obstacles < 0 || cfg->num_obstacles > MAX_OBSTACLES) {
-                    fprintf(stderr, "Erro: obstacles deve estar entre 0 e %d\n", MAX_OBSTACLES);
+                if (cfg->num_obstacles < 0) {
+                    fprintf(stderr, "Erro: obstacles nao pode ser negativo\n");
                     return -1;
                 }
                 break;
@@ -513,8 +509,8 @@ int qlearning_alloc(QLearning *ql, Config *cfg) {
         if (!ql->grid[i]) return -1;
     }
     
-    /* Aloca lista de obstáculos */
-    ql->obstacles = (int *)malloc(MAX_OBSTACLES * sizeof(int));
+    /* Aloca lista de obstáculos (máximo possível: todas as células exceto início e objetivo) */
+    ql->obstacles = (int *)malloc(num_states * sizeof(int));
     if (!ql->obstacles) return -1;
     
     return 0;
