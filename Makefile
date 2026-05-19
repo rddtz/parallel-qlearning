@@ -20,25 +20,25 @@ CFLAGS = -Wall -Wextra -O2 -fopenmp
 LDFLAGS = -lm
 
 # Arquivos executáveis
-CLI = qlearning
-PARALLEL = qlearning_parallel
-TEST_CLI = test_qlearning_cli
+CLI = bin/qlearning
+PARALLEL = bin/qlearning_parallel
+TEST_CLI = bin/test_qlearning_cli
 
 # Regra padrão: compila tudo
 all: $(CLI) $(PARALLEL) $(TEST) $(TEST_CLI)
 
 # Compila versão CLI (recomendado!)
-$(CLI): qlearning_cli.c
+$(CLI): src/qlearning_cli.c
 	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS)
 
 cli: $(CLI)
 
 # Compila os testes (versão CLI dinâmica)
-$(TEST_CLI): test_qlearning_cli.c
+$(TEST_CLI): src/test_qlearning_cli.c
 	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS)
 
 
-$(PARALLEL): parallel_qlearning_cli.c
+$(PARALLEL): src/parallel_qlearning_cli.c
 	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS)
 
 parallel: $(PARALLEL)
