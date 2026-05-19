@@ -27,6 +27,12 @@ TEST_CLI = bin/test_qlearning_cli
 # Regra padrão: compila tudo
 all: $(CLI) $(PARALLEL) $(TEST) $(TEST_CLI)
 
+# Create bin directory if it doesn't exist
+$(CLI) $(PARALLEL) $(TEST_CLI): | bin
+
+bin:
+	mkdir -p bin
+
 # Compila versão CLI (recomendado!)
 $(CLI): src/qlearning_cli.c
 	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS)
@@ -84,7 +90,7 @@ test-cli: $(TEST_CLI)
 
 # Limpa arquivos compilados
 clean:
-	rm -f $(CLI) $(TEST) $(TEST_CLI)
+	rm -rf bin
 
 # Marca alvos que não são arquivos
 .PHONY: all cli run run-easy run-hard run-extreme demo help test-cli test-all clean
