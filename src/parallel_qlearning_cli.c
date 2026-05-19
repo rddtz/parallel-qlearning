@@ -2,20 +2,20 @@
  * =============================================================================
  * Q-LEARNING SEQUENCIAL EM C - VERSÃO COM ARGUMENTOS DE LINHA DE COMANDO
  * =============================================================================
- * 
+ *
  * Este código implementa o algoritmo Q-Learning para aprendizado por reforço.
  * Agora com suporte completo a configuração via linha de comando!
- * 
+ *
  * USO:
  * ----
  *   ./qlearning_sequential [opções]
- * 
+ *
  * MODOS PREDEFINIDOS:
  *   --mode easy      Grid 3x3, poucos obstáculos, aprendizado rápido
  *   --mode normal    Grid 4x4, configuração balanceada (padrão)
  *   --mode hard      Grid 6x6, mais obstáculos, mais episódios
  *   --mode extreme   Grid 10x10, muitos obstáculos, desafiador
- * 
+ *
  * OPÇÕES INDIVIDUAIS (sobrescrevem o modo):
  *   --gridx N           Largura do grid (colunas)
  *   --gridy N           Altura do grid (linhas)
@@ -32,13 +32,13 @@
  *   --no-table          Não mostra a Q-table
  *   --no-policy         Não mostra a política visual
  *   --help              Mostra esta ajuda
- * 
+ *
  * EXEMPLOS:
  *   ./qlearning_sequential --mode normal
  *   ./qlearning_sequential --gridx 5 --gridy 5 --obstacles 3 --seed 42
  *   ./qlearning_sequential --mode hard --alpha 0.2 --verbose
  *   ./qlearning_sequential --gridx 8 --gridy 8 --obstacles 10 --episodes 5000
- * 
+ *
  * =============================================================================
  */
 
@@ -55,11 +55,7 @@
  * =============================================================================
  */
 
-/* Limites do sistema */
-#define MAX_GRID_SIZE 50         /* Tamanho máximo do grid */
-#define MAX_STATES (MAX_GRID_SIZE * MAX_GRID_SIZE)
-#define NUM_ACTIONS 4            /* Ações: cima, baixo, esquerda, direita */
-#define MAX_OBSTACLES 100        /* Máximo de obstáculos */
+#define NUM_ACTIONS 4
 
 /* Identificadores das ações */
 #define ACTION_UP    0
@@ -85,32 +81,32 @@ typedef struct {
     /* Dimensões do grid */
     int grid_rows;
     int grid_cols;
-    
+
     /* Hiperparâmetros do Q-Learning */
     double alpha;           /* Taxa de aprendizado */
     double gamma;           /* Fator de desconto */
     double epsilon;         /* Taxa de exploração */
-    
+
     /* Parâmetros de treinamento */
     int num_episodes;       /* Número de episódios */
     int max_steps;          /* Máximo de passos por episódio */
-    
+
     /* Obstáculos */
     int num_obstacles;      /* Quantidade de obstáculos */
     unsigned int seed;      /* Seed para aleatoriedade */
-    
+
     /* Recompensas */
     double reward_goal;
     double reward_obstacle;
     double reward_step;
-    
+
     /* Opções de saída */
     int verbose;            /* Mostra progresso a cada 100 episódios */
     int step_by_step;       /* Mostra cada passo do treinamento */
     int quiet;              /* Modo silencioso */
     int show_table;         /* Mostra Q-table */
     int show_policy;        /* Mostra política visual */
-    
+
     /* Modo predefinido */
     char mode[20];
 } Config;
@@ -127,6 +123,7 @@ typedef struct {
     int start_state;        /* Estado inicial */
     int num_states;         /* Total de estados */
     Config *config;         /* Ponteiro para configuração */
+    unsigned int rand_seed; /* Semente per-thread para rand_r (sem lock global) */
 } QLearning;
 
 /* =============================================================================
@@ -163,7 +160,7 @@ void config_set_defaults(Config *cfg) {
  */
 void config_apply_mode(Config *cfg, const char *mode) {
     strcpy(cfg->mode, mode);
-    
+
     if (strcmp(mode, "easy") == 0) {
         /* Modo fácil: grid pequeno, poucos obstáculos */
         cfg->grid_rows = 3;
@@ -225,6 +222,10 @@ void config_apply_mode(Config *cfg, const char *mode) {
         config_apply_mode(cfg, "normal");
     }
 }
+
+
+void print_q_table(QLearning *ql);
+void print_policy(QLearning *ql);
 
 /* =============================================================================
  * HELP E PARSING DE ARGUMENTOS
@@ -301,11 +302,11 @@ int parse_arguments(int argc, char *argv[], Config *cfg) {
         {"help",      no_argument,       0, 'h'},
         {0, 0, 0, 0}
     };
-    
+
     int opt;
     int option_index = 0;
     int mode_set = 0;
-    
+
     /* Primeira passagem: procura por --mode para aplicar primeiro */
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--mode") == 0 && i + 1 < argc) {
@@ -319,17 +320,17 @@ int parse_arguments(int argc, char *argv[], Config *cfg) {
             break;
         }
     }
-    
+
     /* Se nenhum modo foi especificado, usa normal */
     if (!mode_set) {
         config_apply_mode(cfg, "normal");
     }
-    
+
     /* Reset getopt */
     optind = 1;
-    
+
     /* Segunda passagem: processa todos os argumentos */
-    while ((opt = getopt_long(argc, argv, "m:x:y:o:s:a:g:e:n:t:vSqTPh", 
+    while ((opt = getopt_long(argc, argv, "m:x:y:o:s:a:g:e:n:t:vSqTPh",
                               long_options, &option_index)) != -1) {
         switch (opt) {
             case 'm':
@@ -337,22 +338,22 @@ int parse_arguments(int argc, char *argv[], Config *cfg) {
                 break;
             case 'x':
                 cfg->grid_cols = atoi(optarg);
-                if (cfg->grid_cols < 2 || cfg->grid_cols > MAX_GRID_SIZE) {
-                    fprintf(stderr, "Erro: gridx deve estar entre 2 e %d\n", MAX_GRID_SIZE);
+                if (cfg->grid_cols < 2) {
+                    fprintf(stderr, "Erro: gridx deve ser pelo menos 2\n");
                     return -1;
                 }
                 break;
             case 'y':
                 cfg->grid_rows = atoi(optarg);
-                if (cfg->grid_rows < 2 || cfg->grid_rows > MAX_GRID_SIZE) {
-                    fprintf(stderr, "Erro: gridy deve estar entre 2 e %d\n", MAX_GRID_SIZE);
+                if (cfg->grid_rows < 2) {
+                    fprintf(stderr, "Erro: gridy deve ser pelo menos 2\n");
                     return -1;
                 }
                 break;
             case 'o':
                 cfg->num_obstacles = atoi(optarg);
-                if (cfg->num_obstacles < 0 || cfg->num_obstacles > MAX_OBSTACLES) {
-                    fprintf(stderr, "Erro: obstacles deve estar entre 0 e %d\n", MAX_OBSTACLES);
+                if (cfg->num_obstacles < 0) {
+                    fprintf(stderr, "Erro: obstacles nao pode ser negativo\n");
                     return -1;
                 }
                 break;
@@ -422,7 +423,7 @@ int parse_arguments(int argc, char *argv[], Config *cfg) {
                 return -1;
         }
     }
-    
+
     /* Valida que há espaço suficiente para objetivo e início */
     int total_cells = cfg->grid_rows * cfg->grid_cols;
     if (cfg->num_obstacles >= total_cells - 1) {
@@ -430,7 +431,7 @@ int parse_arguments(int argc, char *argv[], Config *cfg) {
                 cfg->num_obstacles, cfg->grid_cols, cfg->grid_rows, total_cells - 2);
         return -1;
     }
-    
+
     return 0;
 }
 
@@ -454,18 +455,12 @@ void state_to_coords(Config *cfg, int state, int *row, int *col) {
     *col = state % cfg->grid_cols;
 }
 
-/**
- * Gera número aleatório entre 0 e 1
- */
-double random_double(void) {
-    return (double)rand() / RAND_MAX;
+double random_double(QLearning *ql) {
+    return (double)rand_r(&ql->rand_seed) / RAND_MAX;
 }
 
-/**
- * Gera número inteiro aleatório entre 0 e max-1
- */
-int random_int(int max) {
-    return rand() % max;
+int random_int(QLearning *ql, int max) {
+    return rand_r(&ql->rand_seed) % max;
 }
 
 /**
@@ -492,32 +487,32 @@ const char* action_to_string(int action) {
 int qlearning_alloc(QLearning *ql, Config *cfg) {
     int i;
     int num_states = cfg->grid_rows * cfg->grid_cols;
-    
+
     ql->config = cfg;
     ql->num_states = num_states;
-    
+
     /* Aloca Q-table */
     ql->q_table = (double **)malloc(num_states * sizeof(double *));
     if (!ql->q_table) return -1;
-    
+
     for (i = 0; i < num_states; i++) {
         ql->q_table[i] = (double *)calloc(NUM_ACTIONS, sizeof(double));
         if (!ql->q_table[i]) return -1;
     }
-    
+
     /* Aloca grid */
     ql->grid = (int **)malloc(cfg->grid_rows * sizeof(int *));
     if (!ql->grid) return -1;
-    
+
     for (i = 0; i < cfg->grid_rows; i++) {
         ql->grid[i] = (int *)calloc(cfg->grid_cols, sizeof(int));
         if (!ql->grid[i]) return -1;
     }
-    
-    /* Aloca lista de obstáculos */
-    ql->obstacles = (int *)malloc(MAX_OBSTACLES * sizeof(int));
+
+    /* Aloca lista de obstáculos (máximo possível: todas as células exceto início e objetivo) */
+    ql->obstacles = (int *)malloc(num_states * sizeof(int));
     if (!ql->obstacles) return -1;
-    
+
     return 0;
 }
 
@@ -527,21 +522,21 @@ int qlearning_alloc(QLearning *ql, Config *cfg) {
 void qlearning_free(QLearning *ql) {
     int i;
     Config *cfg = ql->config;
-    
+
     if (ql->q_table) {
         for (i = 0; i < ql->num_states; i++) {
             free(ql->q_table[i]);
         }
         free(ql->q_table);
     }
-    
+
     if (ql->grid) {
         for (i = 0; i < cfg->grid_rows; i++) {
             free(ql->grid[i]);
         }
         free(ql->grid);
     }
-    
+
     free(ql->obstacles);
 }
 
@@ -558,14 +553,14 @@ int is_valid_obstacle_position(QLearning *ql, int state) {
     if (state == ql->start_state || state == ql->goal_state) {
         return 0;
     }
-    
+
     /* Verifica se já é obstáculo */
     for (int i = 0; i < ql->num_obstacles; i++) {
         if (ql->obstacles[i] == state) {
             return 0;
         }
     }
-    
+
     return 1;
 }
 
@@ -577,24 +572,24 @@ void generate_random_obstacles(QLearning *ql) {
     int placed = 0;
     int max_attempts = cfg->grid_rows * cfg->grid_cols * 10;
     int attempts = 0;
-    
+
     while (placed < cfg->num_obstacles && attempts < max_attempts) {
-        int state = random_int(ql->num_states);
-        
+        int state = random_int(ql, ql->num_states);
+
         if (is_valid_obstacle_position(ql, state)) {
             ql->obstacles[placed] = state;
-            
+
             int row, col;
             state_to_coords(cfg, state, &row, &col);
             ql->grid[row][col] = CELL_OBSTACLE;
-            
+
             placed++;
         }
         attempts++;
     }
-    
+
     ql->num_obstacles = placed;
-    
+
     if (placed < cfg->num_obstacles && !cfg->quiet) {
         printf("Aviso: Só foi possível colocar %d obstáculos (pedidos: %d)\n",
                placed, cfg->num_obstacles);
@@ -607,32 +602,31 @@ void generate_random_obstacles(QLearning *ql) {
 void qlearning_init(QLearning *ql) {
     Config *cfg = ql->config;
     int i, j;
-    
-    /* Inicializa gerador de números aleatórios */
-    srand(cfg->seed);
-    
+
+    ql->rand_seed = cfg->seed;
+
     /* Inicializa Q-table com zeros */
     for (i = 0; i < ql->num_states; i++) {
         for (j = 0; j < NUM_ACTIONS; j++) {
             ql->q_table[i][j] = 0.0;
         }
     }
-    
+
     /* Inicializa o grid */
     for (i = 0; i < cfg->grid_rows; i++) {
         for (j = 0; j < cfg->grid_cols; j++) {
             ql->grid[i][j] = CELL_EMPTY;
         }
     }
-    
+
     /* Define posições de início e objetivo */
     ql->start_state = 0;  /* Sempre (0,0) */
     ql->goal_state = coords_to_state(cfg, cfg->grid_rows - 1, cfg->grid_cols - 1);
-    
+
     /* Marca início e objetivo no grid */
     ql->grid[0][0] = CELL_START;
     ql->grid[cfg->grid_rows - 1][cfg->grid_cols - 1] = CELL_GOAL;
-    
+
     /* Gera obstáculos aleatórios */
     ql->num_obstacles = 0;
     generate_random_obstacles(ql);
@@ -668,22 +662,22 @@ int is_obstacle(QLearning *ql, int state) {
 int get_next_state(QLearning *ql, int current_state, int action) {
     Config *cfg = ql->config;
     int row, col, new_row, new_col;
-    
+
     state_to_coords(cfg, current_state, &row, &col);
     new_row = row;
     new_col = col;
-    
+
     switch (action) {
         case ACTION_UP:    new_row = row - 1; break;
         case ACTION_DOWN:  new_row = row + 1; break;
         case ACTION_LEFT:  new_col = col - 1; break;
         case ACTION_RIGHT: new_col = col + 1; break;
     }
-    
+
     if (is_valid_state(cfg, new_row, new_col)) {
         return coords_to_state(cfg, new_row, new_col);
     }
-    
+
     return current_state;
 }
 
@@ -692,7 +686,7 @@ int get_next_state(QLearning *ql, int current_state, int action) {
  */
 double get_reward(QLearning *ql, int next_state) {
     Config *cfg = ql->config;
-    
+
     if (next_state == ql->goal_state) {
         return cfg->reward_goal;
     } else if (is_obstacle(ql, next_state)) {
@@ -714,13 +708,13 @@ int is_terminal_state(QLearning *ql, int state) {
 double get_max_q_value(QLearning *ql, int state) {
     int action;
     double max_value = ql->q_table[state][0];
-    
+
     for (action = 1; action < NUM_ACTIONS; action++) {
         if (ql->q_table[state][action] > max_value) {
             max_value = ql->q_table[state][action];
         }
     }
-    
+
     return max_value;
 }
 
@@ -731,73 +725,35 @@ int select_action(QLearning *ql, int state) {
     Config *cfg = ql->config;
     int action, best_action;
     double best_value;
-    
+
     /* Com probabilidade ε, explora (ação aleatória) */
-    if (random_double() < cfg->epsilon) {
-        return random_int(NUM_ACTIONS);
+    if (random_double(ql) < cfg->epsilon) {
+        return random_int(ql, NUM_ACTIONS);
     }
-    
-    ///* Caso contrário, explota (melhor ação conhecida) */
-    //best_action = 0;
-    //best_value = ql->q_table[state][0];
-    //
-    //for (action = 1; action < NUM_ACTIONS; action++) {
-    //    if (ql->q_table[state][action] > best_value) {
-    //        best_value = ql->q_table[state][action];
-    //        best_action = action;
-    //    }
-    //}
 
     /* Caso contrário, explota (melhor ação conhecida) */
-    /* Encontra a ação com maior valor Q para o estado atual */
     best_action = 0;
     best_value = ql->q_table[state][0];
-    
-    /*
-    Possui duas regiões críticas: best_value e best_action.
-    Foi criado duas variáveis locais local_best_value e local_best_action onde
-    cada thread terá o seu melhor valor local e melhor ação local. No final, atualiza a região crítica.
-    */
-    #pragma omp parallel
-    {
 
-        double local_best_value = ql->q_table[state][0];
-        int local_best_action = 0;
-
-        // Usa-se o nowait para evitar a sincronização de threads depois do loop.
-        // Faz com que as threads possam atualizar de forma segura o melhor valor globa e o melhor ação global
-        #pragma omp for nowait
-        for (action = 1; action < NUM_ACTIONS; action++) {
-            if (ql->q_table[state][action] > best_value) {
-                best_value = ql->q_table[state][action];
-                best_action = action;
-            }
-        }
-
-        #pragma omp critical
-        {
-            if(local_best_value > best_value){
-                    best_value = local_best_value;
-                    best_action = local_best_action;
-            }
-        }
-
+    for (action = 1; action < NUM_ACTIONS; action++) {
+       if (ql->q_table[state][action] > best_value) {
+           best_value = ql->q_table[state][action];
+           best_action = action;
+       }
     }
-
-    
     return best_action;
 }
 
 /**
  * Atualiza o valor Q usando a equação de Bellman
  */
-void update_q_value(QLearning *ql, int state, int action, 
+void update_q_value(QLearning *ql, int state, int action,
                     double reward, int next_state) {
     Config *cfg = ql->config;
     double current_q = ql->q_table[state][action];
     double max_next_q = get_max_q_value(ql, next_state);
-    
-    ql->q_table[state][action] = current_q + 
+
+    ql->q_table[state][action] = current_q +
         cfg->alpha * (reward + cfg->gamma * max_next_q - current_q);
 }
 
@@ -809,38 +765,38 @@ double run_episode(QLearning *ql, int episode_num) {
     int step, state, action, next_state;
     double reward, total_reward;
     int row, col;
-    
+
     state = ql->start_state;
     total_reward = 0.0;
-    
+
     for (step = 0; step < cfg->max_steps; step++) {
         action = select_action(ql, state);
         next_state = get_next_state(ql, state, action);
         reward = get_reward(ql, next_state);
-        
+
         /* Mostra passo se modo step-by-step */
         if (cfg->step_by_step) {
             state_to_coords(cfg, state, &row, &col);
-            printf("  Ep %4d | Passo %3d | (%d,%d) -> %s -> ", 
+            printf("  Ep %4d | Passo %3d | (%d,%d) -> %s -> ",
                    episode_num + 1, step + 1, row, col, action_to_string(action));
             state_to_coords(cfg, next_state, &row, &col);
-            printf("(%d,%d) | R=%.1f | Q=%.2f\n", 
+            printf("(%d,%d) | R=%.1f | Q=%.2f\n",
                    row, col, reward, ql->q_table[state][action]);
         }
-        
+
         update_q_value(ql, state, action, reward, next_state);
         total_reward += reward;
-        
+
         if (is_terminal_state(ql, next_state)) {
             if (cfg->step_by_step) {
                 printf("  >>> Objetivo alcançado em %d passos!\n\n", step + 1);
             }
             break;
         }
-        
+
         state = next_state;
     }
-    
+
     return total_reward;
 }
 
@@ -850,37 +806,36 @@ double run_episode(QLearning *ql, int episode_num) {
 void train(QLearning *ql) {
     Config *cfg = ql->config;
     int episode, t, state, action;
-    double total_reward;
     int num_threads;
     QLearning *local_ql_array = NULL;
     double ***local_q_tables = NULL;
-    
+
     if (!cfg->quiet) {
         printf("\nIniciando treinamento com %d episodios...\n", cfg->num_episodes);
-        printf("Hiperparametros: alpha=%.2f, gamma=%.2f, epsilon=%.2f\n", 
+        printf("Hiperparametros: alpha=%.2f, gamma=%.2f, epsilon=%.2f\n",
                cfg->alpha, cfg->gamma, cfg->epsilon);
     }
-    
+
     /* Determina número de threads */
     #pragma omp parallel
     {
         #pragma omp single
         num_threads = omp_get_num_threads();
     }
-    
+
     if (!cfg->quiet) {
         printf("Threads OpenMP: %d\n\n", num_threads);
     }
-    
+
     /* Aloca estruturas para cada thread */
     local_ql_array = (QLearning *)malloc(num_threads * sizeof(QLearning));
     local_q_tables = (double ***)malloc(num_threads * sizeof(double **));
-    
+
     if (!local_ql_array || !local_q_tables) {
         fprintf(stderr, "Erro: Falha ao alocar memoria para threads\n");
         return;
     }
-    
+
     /* Aloca Q-tables locais para cada thread */
     for (t = 0; t < num_threads; t++) {
         local_q_tables[t] = (double **)malloc(ql->num_states * sizeof(double *));
@@ -888,55 +843,103 @@ void train(QLearning *ql) {
             local_q_tables[t][state] = (double *)calloc(NUM_ACTIONS, sizeof(double));
         }
     }
-    
-    /* Executa treinamento paralelo */
-    #pragma omp parallel private(episode, total_reward, t, state, action)
+
+    int sync_interval = cfg->num_episodes / 10;
+    if (sync_interval < num_threads) sync_interval = num_threads;
+    int num_syncs = 0;
+
+    if (!cfg->quiet) {
+        printf("Sincronizando a cada %d episodios\n\n", sync_interval);
+    }
+
+    /* Executa treinamento paralelo com sincronizacao periodica */
+    #pragma omp parallel private(episode, state, action)
     {
         int tid = omp_get_thread_num();
-        QLearning local_ql = *ql;  /* Cópia da estrutura */
-        local_ql.q_table = local_q_tables[tid];  /* Aponta para Q-table local */
-        
+        QLearning local_ql = *ql;
+        local_ql.q_table = local_q_tables[tid];
+        local_ql.rand_seed = cfg->seed + (unsigned int)tid;
+
         /* Copia Q-table inicial para cada thread */
-        #pragma omp for collapse(2) nowait
         for (state = 0; state < ql->num_states; state++) {
             for (action = 0; action < NUM_ACTIONS; action++) {
                 local_ql.q_table[state][action] = ql->q_table[state][action];
             }
         }
         #pragma omp barrier
-        
-        /* Cada thread roda seus episódios */
-        #pragma omp for
-        for (episode = 0; episode < cfg->num_episodes; episode++) {
-            total_reward = run_episode(&local_ql, episode);
-            
-            /* Imprime progresso (apenas thread 0) */
-            if (tid == 0 && cfg->verbose && !cfg->step_by_step && (episode + 1) % 100 == 0) {
-                #pragma omp critical
-                {
+
+        int episode_start = 0;
+        while (episode_start < cfg->num_episodes) {
+            int episode_end = episode_start + sync_interval;
+            if (episode_end > cfg->num_episodes) episode_end = cfg->num_episodes;
+
+            /* Cada thread roda sua parte do chunk */
+            #pragma omp for schedule(static)
+            for (episode = episode_start; episode < episode_end; episode++) {
+                run_episode(&local_ql, episode);
+
+                if (tid == 0 && cfg->verbose && !cfg->step_by_step && (episode + 1) % 100 == 0) {
+                    #pragma omp critical
                     printf("Episodio %5d | Thread: %d/%d\n",
                            episode + 1, tid, num_threads);
                 }
             }
-        }
-    }
-    
-    /* Merge: calcula média das Q-tables */
-    if (!cfg->quiet) {
-        printf("\nMerge das Q-tables...\n");
-    }
-    
-    #pragma omp parallel for collapse(2)
-    for (state = 0; state < ql->num_states; state++) {
-        for (action = 0; action < NUM_ACTIONS; action++) {
-            double sum = 0.0;
-            for (t = 0; t < num_threads; t++) {
-                sum += local_q_tables[t][state][action];
+            /* implicit barrier after omp for */
+
+            /* Merge: media das Q-tables de todas as threads no ql compartilhado */
+            #pragma omp for collapse(2)
+            for (state = 0; state < ql->num_states; state++) {
+                for (action = 0; action < NUM_ACTIONS; action++) {
+                    double sum = 0.0;
+                    int tt;
+                    for (tt = 0; tt < num_threads; tt++) {
+                        sum += local_q_tables[tt][state][action];
+                    }
+                    ql->q_table[state][action] = sum / num_threads;
+                }
             }
-            ql->q_table[state][action] = sum / num_threads;
+            /* implicit barrier after omp for */
+
+            /* Broadcast: cada thread copia a Q-table media de volta integralmente */
+            for (state = 0; state < ql->num_states; state++) {
+                for (action = 0; action < NUM_ACTIONS; action++) {
+                    local_ql.q_table[state][action] = ql->q_table[state][action];
+                }
+            }
+            #pragma omp barrier
+
+            #pragma omp single
+            {
+                num_syncs++;
+                if (!cfg->quiet) {
+                    printf("  [Sync %2d] Episodios %5d-%5d concluidos\n",
+                           num_syncs, episode_start + 1, episode_end);
+                }
+            }
+            /* implicit barrier after omp single */
+
+            episode_start = episode_end;
         }
     }
-    
+
+    if (!cfg->quiet) {
+        #pragma omp parallel
+        {
+            int tid = omp_get_thread_num();
+            QLearning local_ql = *ql;
+            local_ql.q_table = local_q_tables[tid];
+
+            #pragma omp critical
+            {
+                printf("\n=== Q-TABLE DA THREAD %d ===\n", tid);
+                print_q_table(&local_ql);
+                printf("\n=== POLITICA DA THREAD %d ===\n", tid);
+                print_policy(&local_ql);
+            }
+
+            }
+    }
+
     /* Libera memória */
     for (t = 0; t < num_threads; t++) {
         for (state = 0; state < ql->num_states; state++) {
@@ -946,7 +949,7 @@ void train(QLearning *ql) {
     }
     free(local_q_tables);
     free(local_ql_array);
-    
+
     if (!cfg->quiet) {
         printf("\nTreinamento concluido!\n");
     }
@@ -968,7 +971,7 @@ void print_config(Config *cfg) {
     printf("\n");
     printf("CONFIGURAÇÃO:\n");
     printf("  Modo: %s\n", cfg->mode);
-    printf("  Grid: %dx%d (%d estados)\n", cfg->grid_cols, cfg->grid_rows, 
+    printf("  Grid: %dx%d (%d estados)\n", cfg->grid_cols, cfg->grid_rows,
            cfg->grid_rows * cfg->grid_cols);
     printf("  Obstáculos: %d\n", cfg->num_obstacles);
     printf("  Seed: %u\n", cfg->seed);
@@ -983,20 +986,20 @@ void print_config(Config *cfg) {
 void print_grid(QLearning *ql) {
     Config *cfg = ql->config;
     int row, col, state;
-    
+
     printf("\n=== GRID %dx%d ===\n", cfg->grid_cols, cfg->grid_rows);
     printf("(S=início, G=objetivo, X=obstáculo)\n\n");
-    
+
     /* Borda superior */
     printf("+");
     for (col = 0; col < cfg->grid_cols; col++) printf("---+");
     printf("\n");
-    
+
     for (row = 0; row < cfg->grid_rows; row++) {
         printf("|");
         for (col = 0; col < cfg->grid_cols; col++) {
             state = coords_to_state(cfg, row, col);
-            
+
             if (state == ql->start_state) {
                 printf(" S |");
             } else if (state == ql->goal_state) {
@@ -1011,7 +1014,7 @@ void print_grid(QLearning *ql) {
         for (col = 0; col < cfg->grid_cols; col++) printf("---+");
         printf("\n");
     }
-    
+
     /* Lista de obstáculos */
     if (ql->num_obstacles > 0) {
         printf("\nObstáculos em: ");
@@ -1030,18 +1033,18 @@ void print_grid(QLearning *ql) {
 void print_q_table(QLearning *ql) {
     Config *cfg = ql->config;
     int state, action;
-    
+
     printf("\n=== Q-TABLE ===\n");
     printf("Estado |   CIMA   |  BAIXO   |   ESQ    |   DIR    | Melhor\n");
     printf("-------|----------|----------|----------|----------|-------\n");
-    
+
     for (state = 0; state < ql->num_states; state++) {
         int row, col, best_action = 0;
         double best_value = ql->q_table[state][0];
-        
+
         state_to_coords(cfg, state, &row, &col);
         printf("(%d,%d)  |", row, col);
-        
+
         for (action = 0; action < NUM_ACTIONS; action++) {
             printf(" %8.2f |", ql->q_table[state][action]);
             if (ql->q_table[state][action] > best_value) {
@@ -1062,19 +1065,18 @@ void print_policy(QLearning *ql) {
     double best_value;
     int best_action;
     char symbols[4] = {'^', 'v', '<', '>'};
-    
+
     printf("\n=== POLITICA APRENDIDA ===\n");
     printf("(^ = cima, v = baixo, < = esq, > = dir)\n\n");
-    
-    /* Borda superior */
+
     printf("+");
     for (col = 0; col < cfg->grid_cols; col++) printf("---+");
     printf("\n");
-    
+
     for (row = 0; row < cfg->grid_rows; row++) {
         for (col = 0; col < cfg->grid_cols; col++) {
             state = coords_to_state(cfg, row, col);
-            
+
             if (state == ql->goal_state) {
                 printf("| G ");
             } else if (is_obstacle(ql, state)) {
@@ -1103,14 +1105,14 @@ void print_policy(QLearning *ql) {
 int get_best_action(QLearning *ql, int state) {
     int action, best_action = 0;
     double best_value = ql->q_table[state][0];
-    
+
     for (action = 1; action < NUM_ACTIONS; action++) {
         if (ql->q_table[state][action] > best_value) {
             best_value = ql->q_table[state][action];
             best_action = action;
         }
     }
-    
+
     return best_action;
 }
 
@@ -1123,24 +1125,24 @@ void demonstrate_path(QLearning *ql) {
     int step = 0;
     int action;
     int row, col;
-    
+
     printf("\n=== DEMONSTRACAO DO CAMINHO ===\n");
     printf("Caminho do agente do inicio ao objetivo:\n\n");
-    
+
     while (state != ql->goal_state && step < cfg->max_steps) {
         state_to_coords(cfg, state, &row, &col);
         action = get_best_action(ql, state);
-        
-        printf("Passo %2d: Estado (%d,%d) -> Acao: %s\n", 
+
+        printf("Passo %2d: Estado (%d,%d) -> Acao: %s\n",
                step + 1, row, col, action_to_string(action));
-        
+
         state = get_next_state(ql, state, action);
         step++;
     }
-    
+
     if (state == ql->goal_state) {
         state_to_coords(cfg, state, &row, &col);
-        printf("Passo %2d: Estado (%d,%d) -> OBJETIVO ALCANCADO!\n", 
+        printf("Passo %2d: Estado (%d,%d) -> OBJETIVO ALCANCADO!\n",
                step + 1, row, col);
         printf("\nAgente encontrou o caminho em %d passos.\n", step);
     } else {
@@ -1157,58 +1159,58 @@ int main(int argc, char *argv[]) {
     Config cfg;
     QLearning ql;
     int parse_result;
-    
+
     /* Configura valores padrão */
     config_set_defaults(&cfg);
-    
+
     /* Parseia argumentos */
     parse_result = parse_arguments(argc, argv, &cfg);
     if (parse_result != 0) {
         return (parse_result > 0) ? 0 : 1;
     }
-    
+
     /* Mostra configuração */
     if (!cfg.quiet) {
         print_config(&cfg);
     }
-    
+
     /* Aloca memória */
     if (qlearning_alloc(&ql, &cfg) != 0) {
         fprintf(stderr, "Erro: Falha ao alocar memória\n");
         return 1;
     }
-    
+
     /* Inicializa ambiente */
     qlearning_init(&ql);
-    
+
     /* Mostra grid */
     if (!cfg.quiet) {
         print_grid(&ql);
     }
-    
+
     /* Treina */
     train(&ql);
-    
+
     /* Mostra resultados */
     if (cfg.show_table && !cfg.quiet) {
         print_q_table(&ql);
     }
-    
+
     if (cfg.show_policy) {
         print_policy(&ql);
     }
-    
+
     demonstrate_path(&ql);
-    
+
     if (!cfg.quiet) {
         printf("\n");
         printf("════════════════════════════════════════════════════════════════════════════\n");
         printf("                              FIM DA EXECUCAO\n");
         printf("════════════════════════════════════════════════════════════════════════════\n");
     }
-    
+
     /* Libera memória */
     qlearning_free(&ql);
-    
+
     return 0;
 }
