@@ -1088,10 +1088,6 @@ void train(QLearning *ql) {
  * Imprime a configuração atual
  */
 void print_config(Config *cfg) {
-    int total_syncs = cfg->sync_interval > 0
-        ? (cfg->num_episodes + cfg->sync_interval - 1) / cfg->sync_interval
-        : -1;  /* -1 = será calculado após saber num_threads */
-
     printf("\n");
     printf("╔══════════════════════════════════════════════════════════════════════════╗\n");
     printf("║               Q-LEARNING PARALELO (OpenMP) - GRID WORLD                  ║\n");
@@ -1106,11 +1102,16 @@ void print_config(Config *cfg) {
     printf("  Alpha: %.3f | Gamma: %.3f | Epsilon: %.3f\n",
            cfg->alpha, cfg->gamma, cfg->epsilon);
     printf("  Episódios: %d | Max passos: %d\n", cfg->num_episodes, cfg->max_steps);
-    if (cfg->sync_interval > 0) {
-        printf("  Sync a cada: %d episodios (%d syncs)\n",
-               cfg->sync_interval, total_syncs);
+
+    if (strcmp(cfg->sync_mode, "hogwild") == 0) {
+        printf("  Sync: hogwild (lock-free, sem barreiras)\n");
+    } else if (cfg->sync_interval > 0) {
+        int total = (cfg->num_episodes + cfg->sync_interval - 1) / cfg->sync_interval;
+        printf("  Sync: %s | intervalo manual = %d eps (%d syncs)\n",
+               cfg->sync_mode, cfg->sync_interval, total);
     } else {
-        printf("  Sync: automático (episodes/10)\n");
+        printf("  Sync: %s | intervalo automatico (calculado em train)\n",
+               cfg->sync_mode);
     }
 }
 
