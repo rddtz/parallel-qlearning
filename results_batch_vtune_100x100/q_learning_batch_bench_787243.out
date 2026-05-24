@@ -1,0 +1,149 @@
+=== Preparando Ambiente ===
+rm -rf bin
+Iniciando Benchmark em Batch (Grid 100x100, 100000 Eps, 25% Obstáculos)
+----------------------------------------------------
+Executando Versão Sequencial...
+  [CONCLUÍDO] Tempo VTune: 33.752
+        DRAM Bandwidth Bound: 0.0% of Elaped Time | Convergiu: Sim
+----------------------------------------------------
+Iniciando Testes Paralelos...
+>>> Schedule: static
+Executando: Sch: static | Mode: sqrt | Threads: 2
+  [CONCLUÍDO] Tempo VTune: 17.233
+        DRAM Bandwidth Bound: 0.0% of Elaped Time | Convergiu: Sim
+Executando: Sch: static | Mode: sqrt | Threads: 4
+  [CONCLUÍDO] Tempo VTune: 9.242
+        DRAM Bandwidth Bound: 0.0% of Elaped Time | Convergiu: Sim
+Executando: Sch: static | Mode: sqrt | Threads: 8
+  [CONCLUÍDO] Tempo VTune: 6.110
+        DRAM Bandwidth Bound: 0.0% of Elaped Time | Convergiu: Sim
+Executando: Sch: static | Mode: sqrt | Threads: 16
+  [CONCLUÍDO] Tempo VTune: 4.600
+        DRAM Bandwidth Bound: 0.0% of Elaped Time | Convergiu: Sim
+Executando: Sch: static | Mode: sqrt | Threads: 20
+  [CONCLUÍDO] Tempo VTune: 4.502
+        DRAM Bandwidth Bound: 0.0% of Elaped Time | Convergiu: Sim
+Executando: Sch: static | Mode: statespace | Threads: 2
+  [CONCLUÍDO] Tempo VTune: 17.686
+        DRAM Bandwidth Bound: 0.0% of Elaped Time | Convergiu: Sim
+Executando: Sch: static | Mode: statespace | Threads: 4
+  [CONCLUÍDO] Tempo VTune: 9.446
+        DRAM Bandwidth Bound: 0.0% of Elaped Time | Convergiu: Sim
+Executando: Sch: static | Mode: statespace | Threads: 8
+  [CONCLUÍDO] Tempo VTune: 5.817
+        DRAM Bandwidth Bound: 0.0% of Elaped Time | Convergiu: Sim
+Executando: Sch: static | Mode: statespace | Threads: 16
+  [CONCLUÍDO] Tempo VTune: 3.869
+        DRAM Bandwidth Bound: 0.0% of Elaped Time | Convergiu: Sim
+Executando: Sch: static | Mode: statespace | Threads: 20
+  [CONCLUÍDO] Tempo VTune: 3.409
+        DRAM Bandwidth Bound: 0.0% of Elaped Time | Convergiu: Sim
+Executando: Sch: static | Mode: hogwild | Threads: 2
+  [CONCLUÍDO] Tempo VTune: 16.516
+        DRAM Bandwidth Bound: 0.0% of Elaped Time | Convergiu: Sim
+Executando: Sch: static | Mode: hogwild | Threads: 4
+  [CONCLUÍDO] Tempo VTune: 9.181
+        DRAM Bandwidth Bound: 0.0% of Elaped Time | Convergiu: Sim
+Executando: Sch: static | Mode: hogwild | Threads: 8
+  [CONCLUÍDO] Tempo VTune: 5.080
+        DRAM Bandwidth Bound: 0.0% of Elaped Time | Convergiu: Sim
+Executando: Sch: static | Mode: hogwild | Threads: 16
+  [CONCLUÍDO] Tempo VTune: 2.911
+        DRAM Bandwidth Bound: 0.0% of Elaped Time | Convergiu: Sim
+Executando: Sch: static | Mode: hogwild | Threads: 20
+  [CONCLUÍDO] Tempo VTune: 2.253
+        DRAM Bandwidth Bound: 0.0% of Elaped Time | Convergiu: Nao
+>>> Schedule: dynamic
+Executando: Sch: dynamic | Mode: sqrt | Threads: 2
+  [CONCLUÍDO] Tempo VTune: 16.872
+        DRAM Bandwidth Bound: 0.0% of Elaped Time | Convergiu: Sim
+Executando: Sch: dynamic | Mode: sqrt | Threads: 4
+  [CONCLUÍDO] Tempo VTune: 9.267
+        DRAM Bandwidth Bound: 0.0% of Elaped Time | Convergiu: Sim
+Executando: Sch: dynamic | Mode: sqrt | Threads: 8
+  [CONCLUÍDO] Tempo VTune: 5.705
+        DRAM Bandwidth Bound: 0.0% of Elaped Time | Convergiu: Sim
+Executando: Sch: dynamic | Mode: sqrt | Threads: 16
+  [CONCLUÍDO] Tempo VTune: 4.051
+        DRAM Bandwidth Bound: 0.0% of Elaped Time | Convergiu: Sim
+Executando: Sch: dynamic | Mode: sqrt | Threads: 20
+  [CONCLUÍDO] Tempo VTune: 4.079
+        DRAM Bandwidth Bound: 0.0% of Elaped Time | Convergiu: Sim
+Executando: Sch: dynamic | Mode: statespace | Threads: 2
+  [CONCLUÍDO] Tempo VTune: 17.894
+        DRAM Bandwidth Bound: 0.0% of Elaped Time | Convergiu: Sim
+Executando: Sch: dynamic | Mode: statespace | Threads: 4
+  [CONCLUÍDO] Tempo VTune: 9.206
+        DRAM Bandwidth Bound: 0.0% of Elaped Time | Convergiu: Sim
+Executando: Sch: dynamic | Mode: statespace | Threads: 8
+  [CONCLUÍDO] Tempo VTune: 5.662
+        DRAM Bandwidth Bound: 0.0% of Elaped Time | Convergiu: Sim
+Executando: Sch: dynamic | Mode: statespace | Threads: 16
+  [CONCLUÍDO] Tempo VTune: 3.593
+        DRAM Bandwidth Bound: 0.0% of Elaped Time | Convergiu: Sim
+Executando: Sch: dynamic | Mode: statespace | Threads: 20
+  [CONCLUÍDO] Tempo VTune: 3.152
+        DRAM Bandwidth Bound: 0.0% of Elaped Time | Convergiu: Sim
+Executando: Sch: dynamic | Mode: hogwild | Threads: 2
+  [CONCLUÍDO] Tempo VTune: 17.942
+        DRAM Bandwidth Bound: 0.0% of Elaped Time | Convergiu: Sim
+Executando: Sch: dynamic | Mode: hogwild | Threads: 4
+  [CONCLUÍDO] Tempo VTune: 8.665
+        DRAM Bandwidth Bound: 0.0% of Elaped Time | Convergiu: Sim
+Executando: Sch: dynamic | Mode: hogwild | Threads: 8
+  [CONCLUÍDO] Tempo VTune: 5.380
+        DRAM Bandwidth Bound: 0.0% of Elaped Time | Convergiu: Sim
+Executando: Sch: dynamic | Mode: hogwild | Threads: 16
+  [CONCLUÍDO] Tempo VTune: 2.865
+        DRAM Bandwidth Bound: 0.0% of Elaped Time | Convergiu: Sim
+Executando: Sch: dynamic | Mode: hogwild | Threads: 20
+  [CONCLUÍDO] Tempo VTune: 2.155
+        DRAM Bandwidth Bound: 0.0% of Elaped Time | Convergiu: Sim
+>>> Schedule: guided
+Executando: Sch: guided | Mode: sqrt | Threads: 2
+  [CONCLUÍDO] Tempo VTune: 17.236
+        DRAM Bandwidth Bound: 0.0% of Elaped Time | Convergiu: Sim
+Executando: Sch: guided | Mode: sqrt | Threads: 4
+  [CONCLUÍDO] Tempo VTune: 9.168
+        DRAM Bandwidth Bound: 0.0% of Elaped Time | Convergiu: Sim
+Executando: Sch: guided | Mode: sqrt | Threads: 8
+  [CONCLUÍDO] Tempo VTune: 5.859
+        DRAM Bandwidth Bound: 0.0% of Elaped Time | Convergiu: Sim
+Executando: Sch: guided | Mode: sqrt | Threads: 16
+  [CONCLUÍDO] Tempo VTune: 4.399
+        DRAM Bandwidth Bound: 0.0% of Elaped Time | Convergiu: Sim
+Executando: Sch: guided | Mode: sqrt | Threads: 20
+  [CONCLUÍDO] Tempo VTune: 4.857
+        DRAM Bandwidth Bound: 0.0% of Elaped Time | Convergiu: Sim
+Executando: Sch: guided | Mode: statespace | Threads: 2
+  [CONCLUÍDO] Tempo VTune: 17.494
+        DRAM Bandwidth Bound: 0.0% of Elaped Time | Convergiu: Sim
+Executando: Sch: guided | Mode: statespace | Threads: 4
+  [CONCLUÍDO] Tempo VTune: 9.317
+        DRAM Bandwidth Bound: 0.0% of Elaped Time | Convergiu: Sim
+Executando: Sch: guided | Mode: statespace | Threads: 8
+  [CONCLUÍDO] Tempo VTune: 5.690
+        DRAM Bandwidth Bound: 0.0% of Elaped Time | Convergiu: Sim
+Executando: Sch: guided | Mode: statespace | Threads: 16
+  [CONCLUÍDO] Tempo VTune: 3.642
+        DRAM Bandwidth Bound: 0.0% of Elaped Time | Convergiu: Sim
+Executando: Sch: guided | Mode: statespace | Threads: 20
+  [CONCLUÍDO] Tempo VTune: 3.266
+        DRAM Bandwidth Bound: 0.0% of Elaped Time | Convergiu: Sim
+Executando: Sch: guided | Mode: hogwild | Threads: 2
+  [CONCLUÍDO] Tempo VTune: 17.923
+        DRAM Bandwidth Bound: 0.0% of Elaped Time | Convergiu: Sim
+Executando: Sch: guided | Mode: hogwild | Threads: 4
+  [CONCLUÍDO] Tempo VTune: 8.923
+        DRAM Bandwidth Bound: 0.0% of Elaped Time | Convergiu: Sim
+Executando: Sch: guided | Mode: hogwild | Threads: 8
+  [CONCLUÍDO] Tempo VTune: 5.092
+        DRAM Bandwidth Bound: 0.0% of Elaped Time | Convergiu: Sim
+Executando: Sch: guided | Mode: hogwild | Threads: 16
+  [CONCLUÍDO] Tempo VTune: 2.890
+        DRAM Bandwidth Bound: 0.0% of Elaped Time | Convergiu: Sim
+Executando: Sch: guided | Mode: hogwild | Threads: 20
+  [CONCLUÍDO] Tempo VTune: 2.443
+        DRAM Bandwidth Bound: 0.0% of Elaped Time | Convergiu: Sim
+----------------------------------------------------
+Benchmark concluído. Log geral: benchmark_log_geral.csv

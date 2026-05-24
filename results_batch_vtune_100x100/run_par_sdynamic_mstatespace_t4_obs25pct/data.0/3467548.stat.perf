@@ -1,0 +1,69 @@
+# AMPLXE_PERF_STAT
+# hostname : hype5
+# os release : 6.1.0-45-amd64
+# arch : x86_64
+# cpuid : GenuineIntel,6,63,2
+# cpudesc : Intel(R) Xeon(R) CPU E5-2650 v3 @ 2.30GHz
+# total memory : 131723188 kB
+# nrcpus online : 40
+# nrcpus avail : 40
+# sibling cores : 0-9,20-29
+# sibling cores : 10-19,30-39
+# sibling threads : 0,20
+# sibling threads : 1,21
+# sibling threads : 2,22
+# sibling threads : 3,23
+# sibling threads : 4,24
+# sibling threads : 5,25
+# sibling threads : 6,26
+# sibling threads : 7,27
+# sibling threads : 8,28
+# sibling threads : 9,29
+# sibling threads : 10,30
+# sibling threads : 11,31
+# sibling threads : 12,32
+# sibling threads : 13,33
+# sibling threads : 14,34
+# sibling threads : 15,35
+# sibling threads : 16,36
+# sibling threads : 17,37
+# sibling threads : 18,38
+# sibling threads : 19,39
+# process id : 3467548
+;;108655044686;0
+;;83549853774;1
+;;487977616200;2
+;;158579655;3
+;;3627052382;4
+;;3621781488;5
+;;295645229619;6
+;;1811109406;7
+;;787014979;8
+;;319944084;9
+;;101761233360;10
+;;547269824;11
+;;8644560;12
+;;51529;13
+;;58815661663;14
+;;10035270394;15
+;;53653220;16
+;;678471287;17
+;;106510702259;18
+;;104583490011;19
+;;98217234872;20
+;;300926397274;21
+;;602289165;22
+;;98023835085;23
+;;682345218;24
+;;9152;25
+;;4571;26
+;;46921;27
+;;5288;28
+;;<not supported>;29
+;;<not supported>;30
+;;<not supported>;31
+;;<not supported>;32
+;;<not supported>;33
+;;<not supported>;34
+;;<not supported>;35
+;;<not supported>;36

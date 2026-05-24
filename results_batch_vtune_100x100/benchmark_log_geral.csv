@@ -1,0 +1,93 @@
+Tipo,Grid,Episodios,Passos,Obs_Pct,Schedule,Sync_Mode,Threads,Duracao_Vtune,Convergiu
+Sequencial,100,100000,1000,25,N/A,N/A,1,33.752
+        DRAM Bandwidth Bound: 0.0% of Elaped Time,Sim
+Paralelo,100,100000,1000,25,static,sqrt,2,17.233
+        DRAM Bandwidth Bound: 0.0% of Elaped Time,Sim
+Paralelo,100,100000,1000,25,static,sqrt,4,9.242
+        DRAM Bandwidth Bound: 0.0% of Elaped Time,Sim
+Paralelo,100,100000,1000,25,static,sqrt,8,6.110
+        DRAM Bandwidth Bound: 0.0% of Elaped Time,Sim
+Paralelo,100,100000,1000,25,static,sqrt,16,4.600
+        DRAM Bandwidth Bound: 0.0% of Elaped Time,Sim
+Paralelo,100,100000,1000,25,static,sqrt,20,4.502
+        DRAM Bandwidth Bound: 0.0% of Elaped Time,Sim
+Paralelo,100,100000,1000,25,static,statespace,2,17.686
+        DRAM Bandwidth Bound: 0.0% of Elaped Time,Sim
+Paralelo,100,100000,1000,25,static,statespace,4,9.446
+        DRAM Bandwidth Bound: 0.0% of Elaped Time,Sim
+Paralelo,100,100000,1000,25,static,statespace,8,5.817
+        DRAM Bandwidth Bound: 0.0% of Elaped Time,Sim
+Paralelo,100,100000,1000,25,static,statespace,16,3.869
+        DRAM Bandwidth Bound: 0.0% of Elaped Time,Sim
+Paralelo,100,100000,1000,25,static,statespace,20,3.409
+        DRAM Bandwidth Bound: 0.0% of Elaped Time,Sim
+Paralelo,100,100000,1000,25,static,hogwild,2,16.516
+        DRAM Bandwidth Bound: 0.0% of Elaped Time,Sim
+Paralelo,100,100000,1000,25,static,hogwild,4,9.181
+        DRAM Bandwidth Bound: 0.0% of Elaped Time,Sim
+Paralelo,100,100000,1000,25,static,hogwild,8,5.080
+        DRAM Bandwidth Bound: 0.0% of Elaped Time,Sim
+Paralelo,100,100000,1000,25,static,hogwild,16,2.911
+        DRAM Bandwidth Bound: 0.0% of Elaped Time,Sim
+Paralelo,100,100000,1000,25,static,hogwild,20,2.253
+        DRAM Bandwidth Bound: 0.0% of Elaped Time,Nao
+Paralelo,100,100000,1000,25,dynamic,sqrt,2,16.872
+        DRAM Bandwidth Bound: 0.0% of Elaped Time,Sim
+Paralelo,100,100000,1000,25,dynamic,sqrt,4,9.267
+        DRAM Bandwidth Bound: 0.0% of Elaped Time,Sim
+Paralelo,100,100000,1000,25,dynamic,sqrt,8,5.705
+        DRAM Bandwidth Bound: 0.0% of Elaped Time,Sim
+Paralelo,100,100000,1000,25,dynamic,sqrt,16,4.051
+        DRAM Bandwidth Bound: 0.0% of Elaped Time,Sim
+Paralelo,100,100000,1000,25,dynamic,sqrt,20,4.079
+        DRAM Bandwidth Bound: 0.0% of Elaped Time,Sim
+Paralelo,100,100000,1000,25,dynamic,statespace,2,17.894
+        DRAM Bandwidth Bound: 0.0% of Elaped Time,Sim
+Paralelo,100,100000,1000,25,dynamic,statespace,4,9.206
+        DRAM Bandwidth Bound: 0.0% of Elaped Time,Sim
+Paralelo,100,100000,1000,25,dynamic,statespace,8,5.662
+        DRAM Bandwidth Bound: 0.0% of Elaped Time,Sim
+Paralelo,100,100000,1000,25,dynamic,statespace,16,3.593
+        DRAM Bandwidth Bound: 0.0% of Elaped Time,Sim
+Paralelo,100,100000,1000,25,dynamic,statespace,20,3.152
+        DRAM Bandwidth Bound: 0.0% of Elaped Time,Sim
+Paralelo,100,100000,1000,25,dynamic,hogwild,2,17.942
+        DRAM Bandwidth Bound: 0.0% of Elaped Time,Sim
+Paralelo,100,100000,1000,25,dynamic,hogwild,4,8.665
+        DRAM Bandwidth Bound: 0.0% of Elaped Time,Sim
+Paralelo,100,100000,1000,25,dynamic,hogwild,8,5.380
+        DRAM Bandwidth Bound: 0.0% of Elaped Time,Sim
+Paralelo,100,100000,1000,25,dynamic,hogwild,16,2.865
+        DRAM Bandwidth Bound: 0.0% of Elaped Time,Sim
+Paralelo,100,100000,1000,25,dynamic,hogwild,20,2.155
+        DRAM Bandwidth Bound: 0.0% of Elaped Time,Sim
+Paralelo,100,100000,1000,25,guided,sqrt,2,17.236
+        DRAM Bandwidth Bound: 0.0% of Elaped Time,Sim
+Paralelo,100,100000,1000,25,guided,sqrt,4,9.168
+        DRAM Bandwidth Bound: 0.0% of Elaped Time,Sim
+Paralelo,100,100000,1000,25,guided,sqrt,8,5.859
+        DRAM Bandwidth Bound: 0.0% of Elaped Time,Sim
+Paralelo,100,100000,1000,25,guided,sqrt,16,4.399
+        DRAM Bandwidth Bound: 0.0% of Elaped Time,Sim
+Paralelo,100,100000,1000,25,guided,sqrt,20,4.857
+        DRAM Bandwidth Bound: 0.0% of Elaped Time,Sim
+Paralelo,100,100000,1000,25,guided,statespace,2,17.494
+        DRAM Bandwidth Bound: 0.0% of Elaped Time,Sim
+Paralelo,100,100000,1000,25,guided,statespace,4,9.317
+        DRAM Bandwidth Bound: 0.0% of Elaped Time,Sim
+Paralelo,100,100000,1000,25,guided,statespace,8,5.690
+        DRAM Bandwidth Bound: 0.0% of Elaped Time,Sim
+Paralelo,100,100000,1000,25,guided,statespace,16,3.642
+        DRAM Bandwidth Bound: 0.0% of Elaped Time,Sim
+Paralelo,100,100000,1000,25,guided,statespace,20,3.266
+        DRAM Bandwidth Bound: 0.0% of Elaped Time,Sim
+Paralelo,100,100000,1000,25,guided,hogwild,2,17.923
+        DRAM Bandwidth Bound: 0.0% of Elaped Time,Sim
+Paralelo,100,100000,1000,25,guided,hogwild,4,8.923
+        DRAM Bandwidth Bound: 0.0% of Elaped Time,Sim
+Paralelo,100,100000,1000,25,guided,hogwild,8,5.092
+        DRAM Bandwidth Bound: 0.0% of Elaped Time,Sim
+Paralelo,100,100000,1000,25,guided,hogwild,16,2.890
+        DRAM Bandwidth Bound: 0.0% of Elaped Time,Sim
+Paralelo,100,100000,1000,25,guided,hogwild,20,2.443
+        DRAM Bandwidth Bound: 0.0% of Elaped Time,Sim
