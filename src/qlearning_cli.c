@@ -55,10 +55,10 @@
  */
 
 /* Limites do sistema */
-#define MAX_GRID_SIZE 50         /* Tamanho máximo do grid */
+#define MAX_GRID_SIZE 100         /* Tamanho máximo do grid */
 #define MAX_STATES (MAX_GRID_SIZE * MAX_GRID_SIZE)
 #define NUM_ACTIONS 4            /* Ações: cima, baixo, esquerda, direita */
-#define MAX_OBSTACLES 100        /* Máximo de obstáculos */
+#define MAX_OBSTACLES 10000      /* Máximo de obstáculos */
 
 /* Identificadores das ações */
 #define ACTION_UP    0
@@ -102,6 +102,7 @@ typedef struct {
     double reward_goal;
     double reward_obstacle;
     double reward_step;
+    double reward_loop;
     
     /* Opções de saída */
     int verbose;            /* Mostra progresso a cada 100 episódios */
@@ -149,6 +150,7 @@ void config_set_defaults(Config *cfg) {
     cfg->reward_goal = 100.0;
     cfg->reward_obstacle = -100.0;
     cfg->reward_step = -1.0;
+    cfg->reward_loop = -10.0;
     cfg->verbose = 1;
     cfg->step_by_step = 0;
     cfg->quiet = 0;
@@ -635,6 +637,19 @@ void qlearning_init(QLearning *ql) {
     /* Gera obstáculos aleatórios */
     ql->num_obstacles = 0;
     generate_random_obstacles(ql);
+
+    /* Ajusta recompensa do objetivo proporcionalmente ao tamanho do mapa 
+     * se ela for o valor padrão (100.0) ou muito pequena para o grid.
+     * O objetivo deve valer significativamente mais que o custo do caminho.
+     * Distância Manhattan mínima = (rows-1) + (cols-1) */
+    double min_dist = (double)(cfg->grid_rows + cfg->grid_cols - 2);
+    if (cfg->reward_goal <= min_dist * 1.5) {
+        cfg->reward_goal = min_dist * 10.0;
+        if (!cfg->quiet) {
+            printf("Aviso: Recompensa do objetivo ajustada para %.1f para garantir convergência.\n", 
+                   cfg->reward_goal);
+        }
+    }
 }
 
 /* =============================================================================
@@ -728,7 +743,7 @@ double get_max_q_value(QLearning *ql, int state) {
  */
 int select_action(QLearning *ql, int state) {
     Config *cfg = ql->config;
-    int action, best_action;
+    int action;
     double best_value;
     
     /* Com probabilidade ε, explora (ação aleatória) */
@@ -737,17 +752,25 @@ int select_action(QLearning *ql, int state) {
     }
     
     /* Caso contrário, explota (melhor ação conhecida) */
-    best_action = 0;
+    int candidates[NUM_ACTIONS];
+    int num_candidates = 1;
+    candidates[0] = 0;
     best_value = ql->q_table[state][0];
     
     for (action = 1; action < NUM_ACTIONS; action++) {
         if (ql->q_table[state][action] > best_value) {
             best_value = ql->q_table[state][action];
-            best_action = action;
+            candidates[0] = action;
+            num_candidates = 1;
+        } else if (ql->q_table[state][action] == best_value) {
+            candidates[num_candidates++] = action;
         }
     }
     
-    return best_action;
+    if (num_candidates > 1) {
+        return candidates[random_int(num_candidates)];
+    }
+    return candidates[0];
 }
 
 /**
@@ -772,13 +795,24 @@ double run_episode(QLearning *ql, int episode_num) {
     double reward, total_reward;
     int row, col;
     
+    /* Para detectar loops no mesmo episódio */
+    char visited[MAX_STATES];
+    memset(visited, 0, sizeof(visited));
+    
     state = ql->start_state;
+    visited[state] = 1;
     total_reward = 0.0;
     
     for (step = 0; step < cfg->max_steps; step++) {
         action = select_action(ql, state);
         next_state = get_next_state(ql, state, action);
         reward = get_reward(ql, next_state);
+        
+        /* Aplica penalidade se o estado já foi visitado neste episódio */
+        if (visited[next_state]) {
+            reward += cfg->reward_loop;
+        }
+        visited[next_state] = 1;
         
         /* Mostra passo se modo step-by-step */
         if (cfg->step_by_step) {

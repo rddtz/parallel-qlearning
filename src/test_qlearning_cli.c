@@ -36,10 +36,10 @@
  */
 
 /* Limites do sistema */
-#define MAX_GRID_SIZE 50
+#define MAX_GRID_SIZE 100
 #define MAX_STATES (MAX_GRID_SIZE * MAX_GRID_SIZE)
 #define NUM_ACTIONS 4
-#define MAX_OBSTACLES 100
+#define MAX_OBSTACLES 10000
 
 /* Identificadores das ações */
 #define ACTION_UP    0
@@ -74,6 +74,7 @@ typedef struct {
     double reward_goal;
     double reward_obstacle;
     double reward_step;
+    double reward_loop;
     int verbose;
     int step_by_step;
     int quiet;
@@ -111,6 +112,7 @@ void config_set_defaults(Config *cfg) {
     cfg->reward_goal = 100.0;
     cfg->reward_obstacle = -100.0;
     cfg->reward_step = -1.0;
+    cfg->reward_loop = -10.0;
     cfg->verbose = 0;  /* Silencioso para testes */
     cfg->step_by_step = 0;
     cfg->quiet = 1;    /* Modo silencioso para testes */
@@ -372,26 +374,33 @@ double get_max_q_value(QLearning *ql, int state) {
 
 int select_action(QLearning *ql, int state) {
     Config *cfg = ql->config;
-    int action, best_action;
+    int action;
     double best_value;
-    
+
     if (random_double() < cfg->epsilon) {
         return random_int(NUM_ACTIONS);
     }
-    
-    best_action = 0;
+
+    int candidates[NUM_ACTIONS];
+    int num_candidates = 1;
+    candidates[0] = 0;
     best_value = ql->q_table[state][0];
-    
+
     for (action = 1; action < NUM_ACTIONS; action++) {
         if (ql->q_table[state][action] > best_value) {
             best_value = ql->q_table[state][action];
-            best_action = action;
+            candidates[0] = action;
+            num_candidates = 1;
+        } else if (ql->q_table[state][action] == best_value) {
+            candidates[num_candidates++] = action;
         }
     }
-    
-    return best_action;
-}
 
+    if (num_candidates > 1) {
+        return candidates[random_int(num_candidates)];
+    }
+    return candidates[0];
+}
 void update_q_value(QLearning *ql, int state, int action, 
                     double reward, int next_state) {
     Config *cfg = ql->config;
@@ -406,30 +415,40 @@ double run_episode(QLearning *ql, int episode_num) {
     Config *cfg = ql->config;
     int step, state, action, next_state;
     double reward, total_reward;
-    
+
     (void)episode_num; /* Evita warning de variável não usada */
-    
+
+    /* Para detectar loops no mesmo episódio */
+    char visited[MAX_STATES];
+    memset(visited, 0, ql->num_states);
+
     state = ql->start_state;
+    visited[state] = 1;
     total_reward = 0.0;
-    
+
     for (step = 0; step < cfg->max_steps; step++) {
         action = select_action(ql, state);
         next_state = get_next_state(ql, state, action);
         reward = get_reward(ql, next_state);
-        
+
+        /* Aplica penalidade se o estado já foi visitado neste episódio */
+        if (visited[next_state]) {
+            reward += cfg->reward_loop;
+        }
+        visited[next_state] = 1;
+
         update_q_value(ql, state, action, reward, next_state);
         total_reward += reward;
-        
+
         if (is_terminal_state(ql, next_state)) {
             break;
         }
-        
+
         state = next_state;
     }
-    
+
     return total_reward;
 }
-
 void train(QLearning *ql) {
     Config *cfg = ql->config;
     int episode;
@@ -519,6 +538,7 @@ TEST(test_config_defaults) {
     ASSERT_DOUBLE_EQ(cfg.reward_goal, 100.0, "Padrão: reward_goal = 100.0");
     ASSERT_DOUBLE_EQ(cfg.reward_obstacle, -100.0, "Padrão: reward_obstacle = -100.0");
     ASSERT_DOUBLE_EQ(cfg.reward_step, -1.0, "Padrão: reward_step = -1.0");
+    ASSERT_DOUBLE_EQ(cfg.reward_loop, -10.0, "Padrão: reward_loop = -10.0");
 }
 
 TEST(test_mode_easy) {
