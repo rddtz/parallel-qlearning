@@ -85,28 +85,45 @@ O algoritmo Q-Learning foi escolhido para resolver um problema de pathfinding em
 \begin{algorithm}
 \caption{Q-Learning Sequencial}
 \begin{algorithmic}[1]
-\Require $\text{Grid}(L,C)$, Obstáculos$(O)$, Episódios$(E)$, Max\_Passos$(P)$, $\alpha$, $\gamma$, $\varepsilon$
-\State Inicializar $Q[s][a] \leftarrow 0$ para todos os estados $s$ e ações $a$
-\State Gerar Grid com $s_0 = (0,0)$, $g = (L{-}1, C{-}1)$ e $O$ obstáculos aleatórios
-\For{cada episódio $e = 1, \ldots, E$}
-  \State $s \leftarrow s_0$
-  \For{cada passo $t = 1, \ldots, P$}
-    \If{$\text{Random}(0,1) < \varepsilon$}
-      \State $a \leftarrow$ ação aleatória \Comment{exploração}
+\Require Grid$(L, C)$, Obstáculos$(O)$, Episódios$(E)$, Max\_Passos$(P)$
+\Require $\alpha$ (Aprendizado), $\gamma$ (Desconto), $\varepsilon$ (Exploração)
+\Statex \textbf{1. INICIALIZAÇÃO E AMBIENTE}
+\State Alocar dinamicamente $Q\_Table[\text{Estados}][\text{Ações}]$
+\State Preencher $Q\_Table$ com zeros
+\State Gerar Grid$(L, C)$ com Estado\_Inicial $s_0$ em $(0,0)$, Estado\_Objetivo $g$ em $(L{-}1, C{-}1)$
+\State \hspace{1.5em} e posicionar $O$ obstáculos aleatórios (evitando $s_0$ e $g$)
+\State Configurar Recompensas: $R_{\text{objetivo}}(+100)$, $R_{\text{obstáculo}}(-100)$, $R_{\text{passo}}(-1)$, $R_{\text{loop}}(-10)$
+\Statex \textbf{2. NÚCLEO DE APRENDIZADO (Treinamento)}
+\For{cada episódio de $1$ até $E$}
+  \State $s \leftarrow s_0$ (Estado Inicial)
+  \For{cada passo de $1$ até $P$}
+    \State \textit{// Seleção de Ação ($\varepsilon$-Greedy)}
+    \If{$\text{Random}(0, 1) < \varepsilon$}
+      \State $a \leftarrow \text{Escolher\_Ação\_Aleatória()}$
     \Else
-      \State $a \leftarrow \arg\max_{a'} Q[s][a']$ \Comment{explotação}
+      \State $a \leftarrow \arg\max_{a'} Q[s][a']$ (Melhor ação conhecida)
     \EndIf
-    \State $s' \leftarrow \text{próximo\_estado}(s, a)$
-    \State $r \leftarrow \text{recompensa}(s')$
+    \State \textit{// Interação com o Ambiente}
+    \State $s' \leftarrow \text{Calcular\_Próximo\_Estado}(s, a)$
+    \State $r \leftarrow \text{Avaliar\_Recompensa}(s')$
     \If{$s'$ já foi visitado neste episódio}
-      \State $r \leftarrow r + R_{\text{loop}}$ \Comment{penalidade de ciclo}
+      \State $r \leftarrow r + R_{\text{loop}}$ \Comment{Penalidade de ciclo}
     \EndIf
-    \State $Q[s][a] \leftarrow Q[s][a] + \alpha\bigl(r + \gamma \max_{a'} Q[s'][a'] - Q[s][a]\bigr)$
+    \State \textit{// Atualização de Bellman (Aprendizado Temporal)}
+    \State $\text{Max\_Q\_Futuro} \leftarrow \text{Máximo}(Q[s'][\text{todas\_ações}])$
+    \State $Q[s][a] \leftarrow Q[s][a] + \alpha \cdot (r + \gamma \cdot \text{Max\_Q\_Futuro} - Q[s][a])$
+    \State \textit{// Transição de Estado}
     \State $s \leftarrow s'$
-    \If{$s = g$} \textbf{break} \EndIf
+    \If{$s = g$}
+      \State Encerrar Episódio (Objetivo Alcançado)
+    \EndIf
   \EndFor
 \EndFor
-\State $\pi(s) \leftarrow \arg\max_a\, Q[s][a]$ para todo $s$
+\Statex \textbf{3. PÓS-PROCESSAMENTO E SAÍDA}
+\State Política\_Ótima $\pi(s) \leftarrow \arg\max_a Q[s][a]$
+\State Imprimir Visualização do Grid com $\pi(s)$
+\State Simular Caminho Final do Agente
+\State Liberar Memória Alocada
 \end{algorithmic}
 \end{algorithm}
 #+end_export
