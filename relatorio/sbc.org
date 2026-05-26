@@ -81,63 +81,35 @@ O algoritmo Q-Learning foi escolhido para resolver um problema de pathfinding em
 
 *** Pseudocódigo
 
-#+begin_example
-    1 ALGORITMO: Q-Learning Sequencial
-    2 -------------------------------------------------------------------------
-    3 ENTRADAS:
-    4     Grid(L, C), Obstáculos(O), Episódios(E), Max_Passos(P)
-    5     alfa (Aprendizado), gama (Desconto), epsilon (Exploração)
-    6
-    7 1. INICIALIZAÇÃO E AMBIENTE
-    8    |  Alocar dinamicamente Q_Table[Estados][Ações]
-    9    |  Preencher Q_Table com zeros
-   10    |  Gerar Grid(L, C) com:
-   11    |    - Estado_Inicial s0 em (0, 0)
-   12    |    - Estado_Objetivo g em (L-1, C-1)
-   13    |    - Posicionar O obstáculos aleatórios (evitando s0 e g)
-   14    |  Configurar Recompensas:
-   15    |    - R_objetivo (+100)
-   16    |    - R_obstáculo (-100)
-   17    |    - R_passo (-1)
-   18    |    - R_loop (-10)
-   19
-   20 2. NUCLEO DE APRENDIZADO (Treinamento)
-   21    |  PARA cada episódio de 1 até E:
-   22    |  |  s <- s0 (Estado Inicial)
-   23    |  |  PARA cada passo de 1 até P:
-   24    |  |  |
-   25    |  |  |  // Seleção de Ação (epsilon-Greedy)
-   26    |  |  |  SE Random(0, 1) < epsilon ENTÃO:
-   27    |  |  |  |  a <- Escolher_Ação_Aleatória()
-   28    |  |  |  SENÃO:
-   29    |  |  |  |  a <- argmax_a' Q[s][a'] (Melhor ação conhecida)
-   30    |  |  |
-   31    |  |  |  // Interação com o Ambiente
-   32    |  |  |  s' <- Calcular_Próximo_Estado(s, a)
-   33    |  |  |  r  <- Avaliar_Recompensa(s')
-   34    |  |  |
-   35    |  |  |  SE s' já foi visitado neste episódio ENTÃO:
-   36    |  |  |  |  r <- r + R_loop  // Penalidade de ciclo
-   37    |  |  |
-   38    |  |  |  // Atualização de Bellman (Aprendizado Temporal)
-   39    |  |  |  Max_Q_Futuro <- Máximo(Q[s'][todas_ações])
-   40    |  |  |  Q[s][a] <- Q[s][a] + alfa * (r + gama * Max_Q_Futuro - Q[s][a])
-   41    |  |  |
-   42    |  |  |  // Transição de Estado
-   43    |  |  |  s <- s'
-   44    |  |  |
-   45    |  |  |  SE s == g ENTÃO:
-   46    |  |  |  |  Encerrar Episódio (Objetivo Alcançado)
-   47    |  |  FIM PARA
-   48    |  FIM PARA
-   49
-   50 3. POS-PROCESSAMENTO E SAÍDA
-   51    |  Política_Ótima pi(s) <- argmax_a Q[s][a]
-   52    |  Imprimir Visualização do Grid com pi(s)
-   53    |  Simular Caminho Final do Agente
-   54    |  Liberar Memória Alocada
-   55 -------------------------------------------------------------------------
-#+end_example
+#+begin_export latex
+\begin{algorithm}
+\caption{Q-Learning Sequencial}
+\begin{algorithmic}[1]
+\Require $\text{Grid}(L,C)$, Obstáculos$(O)$, Episódios$(E)$, Max\_Passos$(P)$, $\alpha$, $\gamma$, $\varepsilon$
+\State Inicializar $Q[s][a] \leftarrow 0$ para todos os estados $s$ e ações $a$
+\State Gerar Grid com $s_0 = (0,0)$, $g = (L{-}1, C{-}1)$ e $O$ obstáculos aleatórios
+\For{cada episódio $e = 1, \ldots, E$}
+  \State $s \leftarrow s_0$
+  \For{cada passo $t = 1, \ldots, P$}
+    \If{$\text{Random}(0,1) < \varepsilon$}
+      \State $a \leftarrow$ ação aleatória \Comment{exploração}
+    \Else
+      \State $a \leftarrow \arg\max_{a'} Q[s][a']$ \Comment{explotação}
+    \EndIf
+    \State $s' \leftarrow \text{próximo\_estado}(s, a)$
+    \State $r \leftarrow \text{recompensa}(s')$
+    \If{$s'$ já foi visitado neste episódio}
+      \State $r \leftarrow r + R_{\text{loop}}$ \Comment{penalidade de ciclo}
+    \EndIf
+    \State $Q[s][a] \leftarrow Q[s][a] + \alpha\bigl(r + \gamma \max_{a'} Q[s'][a'] - Q[s][a]\bigr)$
+    \State $s \leftarrow s'$
+    \If{$s = g$} \textbf{break} \EndIf
+  \EndFor
+\EndFor
+\State $\pi(s) \leftarrow \arg\max_a\, Q[s][a]$ para todo $s$
+\end{algorithmic}
+\end{algorithm}
+#+end_export
 
 ** Possibilidade de Paralelização
 Com base no código do Q-Learning sequencial, foram identificadas três possíveis abordagens de paralelização:
