@@ -1,0 +1,15 @@
+\begin{thebibliography}{}
+
+\bibitem[Schnorr and Legrand 2013]{schnorr2013visualizing}
+Schnorr, L.~M. and Legrand, A. (2013).
+\newblock Visualizing more performance data than what fits on your screen.
+\newblock In {\em Tools for High Performance Computing 2012}, pages 149--162.
+  Springer.
+
+\bibitem[Schulte et~al. 2012]{orgmode}
+Schulte, E., Davison, D., Dye, T., and Dominik, C. (2012).
+\newblock A multi-language computing environment for literate programming and
+  reproducible research.
+\newblock {\em J. of Stat. Soft.}, 46(3).
+
+\end{thebibliography}
