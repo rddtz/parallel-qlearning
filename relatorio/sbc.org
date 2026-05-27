@@ -70,7 +70,7 @@ executa uma sequência de passos (steps). A cada passo, uma ação é
 escolhida, o ambiente retorna uma recompensa, e o valor correspondente
 na Q-Table é atualizado. Ao longo do treinamento, o agente aprende
 quais ações produzem os melhores resultados para alcançar o objetivo
-desejado.
+desejado, como mostrado no Algoritmo \ref{alg:qlearning}.
 
 *** Problema Escolhido
 O algoritmo Q-Learning foi escolhido para resolver um problema de
@@ -84,6 +84,7 @@ direita.
 #+begin_export latex
 \begin{algorithm}
 \caption{Q-Learning Sequencial}
+\label{alg:qlearning}
 \begin{algorithmic}[1]
 \Require Grid$(L, C)$, Obstáculos$(O)$, Episódios$(E)$, Max\_Passos$(P)$
 \Require $\alpha$ (Aprendizado), $\gamma$ (Desconto), $\varepsilon$ (Exploração)
