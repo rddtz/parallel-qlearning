@@ -16,6 +16,7 @@
 #+LATEX_CLASS_OPTIONS: [12pt]
 
 #+LATEX_HEADER: \sloppy
+#+LATEX_HEADER: \renewcommand{\refname}{Referências}
 #+LATEX_HEADER: \usepackage{algorithm}
 #+LATEX_HEADER: \usepackage{algpseudocode}
 #+LATEX_HEADER: \usepackage{xcolor}
