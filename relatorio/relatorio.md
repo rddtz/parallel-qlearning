@@ -135,7 +135,7 @@ Para solucionar esse problema, foi implementado um método de merge baseado na d
 ```C
 #pragma omp for collapse(2)
 for (state = 0; state < ql->num_states; state++) {
-    for (action = 0; action < NUM_ACTIONS; action++) {
+    for (action D= 0; action < NUM_ACTIONS; action++) {
         double snapshot = ql->q_table[state][action];
         double delta_sum = 0.0;
         for (int tt = 0; tt < num_threads; tt++)
