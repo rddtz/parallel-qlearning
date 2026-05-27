@@ -21,6 +21,9 @@
 #+LATEX_HEADER: \usepackage{algpseudocode}
 #+LATEX_HEADER: \usepackage{xcolor}
 #+LATEX_HEADER: \usepackage{listings}
+#+LATEX_HEADER: \usepackage{booktabs}
+#+LATEX_HEADER: \usepackage{url}
+#+LATEX_HEADER: \usepackage{sbc-template}
 #+LATEX_HEADER: \lstset{basicstyle=\footnotesize\ttfamily, frame=single, breaklines=true, numbers=left, numberstyle=\tiny\color{gray}, language=C, inputencoding=utf8, extendedchars=true}
 
 # PDF generation can be done by make (thanks Luka Stanisic)
@@ -30,16 +33,10 @@
 ** Frontpage                                                        :ignore:
 
 #+BEGIN_EXPORT latex
-\makeatletter
-\let\orgtitle\@title
-\makeatother
-
-\title{\orgtitle}
-
 \author{
    Rayan Raddatz de Matos (00584919) \inst{1},
-   Eduardo Magnus Lazuta ()\inst{1}, \\
-   Enzo Lisboa Peixoto ()\inst{1}}
+   Eduardo Magnus Lazuta (00325091)\inst{1}, \\
+   Enzo Lisbôa Peixoto (00584827)\inst{1}}
 
 \address{
    Instituto de Informática, Universidade Federal do Rio Grande do Sul (UFRGS)\\
@@ -48,40 +45,20 @@
 #+END_EXPORT
 
 #+LaTeX: \maketitle
+** Algoritmo e Problema
 
-** Abstract                                                         :ignore:
+O Q-Learning é um método de aprendizado por reforço que treina um
+agente por meio de episódios. Em cada episódio, o agente parte do
+estado inicial e executa ações até atingir o objetivo ou esgotar o
+limite de passos. Cada passo atualiza a Q-Table com a equação de
+Bellman: $Q(s,a) \leftarrow Q(s,a) + \alpha[r + \gamma \max_{a'}
+Q(s',a') - Q(s,a)]$. Após o treinamento, a política ótima é extraída
+como $\pi(s) = \arg\max_a Q(s,a)$.
 
-#+begin_abstract
-Put the abstract here.
-#+end_abstract
-
-#+begin_resumo
-Coloque o resumo aqui.
-#+end_resumo
-
-** Apresentação do Algoritmo
-*** Explicação do Algoritmo
-O algoritmo Q-Learning é um método de aprendizado por reforço no qual
-um agente aprende a alcançar um objetivo final utilizando uma tabela
-chamada Q-Table. Essa tabela armazena valores para cada par de estado
-e ação, indicando o quão boa é determinada ação em um estado
-específico. Com base nesses valores, o agente tende a escolher as
-ações que possuem as maiores recompensas esperadas.
-
-Para construir essa tabela, o agente precisa passar por um processo de
-treinamento composto por vários episódios. Em cada episódio, o agente
-executa uma sequência de passos (steps). A cada passo, uma ação é
-escolhida, o ambiente retorna uma recompensa, e o valor correspondente
-na Q-Table é atualizado. Ao longo do treinamento, o agente aprende
-quais ações produzem os melhores resultados para alcançar o objetivo
-desejado, como mostrado no Algoritmo \ref{alg:qlearning}.
-
-*** Problema Escolhido
-O algoritmo Q-Learning foi escolhido para resolver um problema de
-pathfinding em um mundo em formato de grade. O desafio consiste em
-fazer um agente chegar ao ponto final utilizando apenas quatro ações
-de movimento: mover-se para cima, para baixo, para a esquerda e para a
-direita.
+O problema escolhido é pathfinding em grade $L \times C$: o agente parte de
+$(0,0)$ e deve atingir $(L{-}1,C{-}1)$ desviando de obstáculos com as
+ações cima, baixo, esquerda, direita. Algoritmo \ref{alg:qlearning}
+descrever o comportamento completo da aplicação sequencial.
 
 
 #+begin_export latex
@@ -132,176 +109,181 @@ direita.
 \end{algorithm}
 #+end_export
 
-** Possibilidade de Paralelização
-Com base no código do Q-Learning sequencial, foram identificadas três
-possíveis abordagens de paralelização:
+** Paralelização
 
-- Paralelização da obtenção da melhor ação;
-- Paralelização dos steps;
-- Paralelização dos episódios.
+*** Escolha do Nível de Paralelismo
 
-A paralelização da obtenção da melhor ação foi descartada, pois o
-número de ações disponíveis para o agente é relativamente pequeno, não
-proporcionando ganho de desempenho significativo que justificasse o
-custo da paralelização.
+Quando paramos para discutir como paralelizar, tivemos três ideias:
 
-A paralelização dos steps também foi descartada, uma vez que cada step
-depende diretamente do estado atual, e o estado atual é resultado da
-ação executada no step anterior. Dessa forma, existe uma dependência
-verdadeira entre as execuções, tornando necessária a sincronização
-entre as threads e reduzindo os benefícios da paralelização.
+- *Ações* (seleção do argmax): descartada, pois o número de ações é
+  apenas 4, o overhead de sincronização seria muito maior que qualquer
+  ganho.
+- *Steps* (passos dentro de um episódio): descartada, pois cada step depende
+  do estado resultante do passo anterior, dependência de dados
+  verdadeira faria com que as threads ficassem esperando e trabalhando
+  sequencialmente por baixo dos panos.
+- *Episódios*: escolhida. Episódios são independentes entre si: cada um parte
+  do estado inicial, executa uma trajetória completa e atualiza a Q-Table.
+  Não há dependência entre episódios distintos, o que permite distribuição
+  direta via =omp for=.
 
-Por fim, a paralelização dos episódios foi escolhida como a abordagem
-mais adequada, pois cada episódio pode ser executado de forma
-independente. Isso reduz problemas de dependência entre threads e
-permite melhor aproveitamento do paralelismo durante o treinamento do
-agente.
 
-** Maneiras de Paralelizar os Episódios
-Como dito anteriormente, a paralelização dos episódios foi escolhida
-como a mais adequada, porém existe duas possíveis de parelizar os
-episódios:
+Após decidir começamos a paralelizar com o =omp parallel for=,
+entretanto após alguma execuções de teste vimos que apenas paralelizar
+não seria o suficiente. Quando executamos vimos que nunca havia
+convergência para o algoritmo paralelizado apesar de ter um grande
+speedup. Isso acontecia pois ao rodar um problema com 10000 episódios
+e 4 threads, por exemplo, cada thread executava 2500 episódios, mas
+acabava por não comunicar seu conhecimento com as outras threads,
+então o conhecimento final das 4 threads era o mesmo que rodar
+sequencialmente com 2500 episódios, pensando nesse problema tivemos
+que implementar sincronização ao código, limitando o potencial
+paralelo.
 
-- A primeira maneira é que cada thread vai ter sua Q-Table Local e
-  dado tantos episódios, vai sincronizar com a Q-Table Global (a que
-  será aprendida no final);
-- A segunda maneira é que cada thread vai acessar e atualizar
-  diretamente na Q-Table Global. Esse método é chamado de HogWild;
+*** Sincronização no treino
 
-*** Com Sincronização
+Cada thread mantém uma Q-Table local e executa um lote de episódios de
+forma autônoma. Ao final de cada lote (/chunk/ de =sync_interval=
+episódios) as tabelas são fundidas na Q-Table global e
+redistribuídas. O ciclo repete até esgotar os episódios:
 
-Na abordagem com sincronização, cada thread mantém uma cópia local da
-Q-Table e treina de forma independente por um intervalo fixo de
-episódios. Ao final de cada intervalo, as tabelas locais são
-combinadas em uma média ponderada que é transmitida de volta a todas
-as threads --- um ciclo denominado /federated averaging/.
-
-O intervalo de sincronização é calculado automaticamente por duas
-heurísticas, selecionáveis via =--sync-mode=:
-
-- *sqrt* --- O intervalo é $\lfloor\sqrt{N/T}\rfloor$, onde $N$ é o
-  total de episódios e $T$ o número de threads. Essa heurística
-  minimiza o regret bound em algoritmos paralelos de gradiente
-  estocástico: sincronizações muito frequentes desperdiçam tempo em
-  barreiras; sincronizações muito raras permitem que as tabelas
-  locais divirjam demais antes da fusão \cite{niu2011hogwild}.
-- *statespace* --- O intervalo equivale ao número de estados do grid
-  ($L \times C$). A ideia é que cada thread percorra ao menos uma vez
-  todos os estados antes de sincronizar, garantindo que a média
-  resultante reflita experiências cobrindo o espaço de estados
-  inteiro.
-
-A fusão das tabelas usa um merge baseado em \textit{delta} para
-corrigir a diluição que ocorre quando o tamanho do chunk é menor do
-que o número de threads. No merge absoluto, threads que não recebem
-episódios em um chunk ficam com a tabela do broadcast anterior (igual
-ao snapshot), mas ainda contribuem para a média, diluindo os updates
-reais pelo fator $1/T$. A correção calcula apenas os deltas das
-threads ativas:
-
-$$Q_{\text{novo}}[s][a] = Q_{\text{snap}}[s][a] +
-\frac{\displaystyle\sum_{t} \bigl(Q_t[s][a] - Q_{\text{snap}}[s][a]\bigr)}{T_{\text{ativas}}}$$
-
-onde $T_{\text{ativas}} = \min(\text{chunk}, T)$. Threads ociosas
-contribuem delta zero e não afetam a divisão, preservando o
-alpha efetivo de cada update.
-
-#+CAPTION: Merge delta no federated averaging (train_federated)
 #+begin_export latex
-\begin{lstlisting}[float=h]
-int chunk_size = episode_end - episode_start;
-int active     = (chunk_size < num_threads) ? chunk_size : num_threads;
+\begin{lstlisting}[caption={Regiao paralela de train com sincronizacao (parallel\_qlearning\_cli.c)}]
+#pragma omp parallel private(episode, state, action)
+{
+    int tid = omp_get_thread_num();
+    QLearning local_ql  = *ql;
+    local_ql.q_table    = local_q_tables[tid]; /* Q-Table propria por thread */
+    local_ql.rand_seed  = cfg->seed + (unsigned int)tid;
+    /* copia tabela global para local antes de comecar */
+    #pragma omp barrier
 
-#pragma omp for collapse(2)
-for (state = 0; state < ql->num_states; state++) {
-    for (action = 0; action < NUM_ACTIONS; action++) {
-        double snapshot  = ql->q_table[state][action];
-        double delta_sum = 0.0;
-        for (tt = 0; tt < num_threads; tt++)
-            delta_sum += local_q_tables[tt][state][action] - snapshot;
-        ql->q_table[state][action] = snapshot + delta_sum / active;
+    while (episode_start < cfg->num_episodes) {
+        /* Treinamento local -- omp for distribui o chunk */
+        #pragma omp for schedule(runtime)
+        for (episode = episode_start; episode < episode_end; episode++)
+            run_episode(&local_ql, episode);
+        /* barreira implicita apos omp for */
+
+        /* Merge com delta na Q-Table global */
+        int active = (chunk_size < num_threads) ? chunk_size : num_threads;
+        #pragma omp for collapse(2)
+        for (state = 0; state < ql->num_states; state++)
+            for (action = 0; action < NUM_ACTIONS; action++) {
+                double snapshot  = ql->q_table[state][action];
+                double delta_sum = 0.0;
+                for (tt = 0; tt < num_threads; tt++)
+                    delta_sum += local_q_tables[tt][state][action] - snapshot;
+                ql->q_table[state][action] = snapshot + delta_sum / active;
+            }
+
+        /* Broadcast -- global copiada de volta para local */
+        for (state ...) for (action ...)
+            local_ql.q_table[state][action] = ql->q_table[state][action];
+        #pragma omp barrier
+
+        episode_start = episode_end;
     }
 }
 \end{lstlisting}
 #+end_export
 
-Apos o merge, a tabela global e transmitida a todas as threads
-(broadcast) antes do proximo chunk, de modo que cada thread comeca
-o intervalo seguinte a partir de um estado de conhecimento compartilhado.
+*Por que delta e não média absoluta?* Se um chunk tem menos episódios que
+threads, algumas threads ficam ociosas e mantém =local_ql.q_table= igual
+ao broadcast anterior (delta zero). Usar a média absoluta dividiria a soma dos
+updates por $T$ mesmo com apenas $k < T$ threads ativas, diluindo o
+aprendizado. O merge por delta divide apenas pelas $k$ threads ativas
+($\texttt{active} = \min(\texttt{chunk\_size}, T)$), preservando o $\alpha$
+efetivo de cada update.
+
+*Heurísticas de =sync_interval=*: foram implementadas duas estratégias
+automáticas no dispatcher =train()=:
+
+#+begin_export latex
+\begin{lstlisting}[caption={Calculo automatico do sync\_interval (train())}]
+if (strcmp(cfg->sync_mode, "sqrt") == 0)
+    /* sqrt(N/T): equilibra overhead de barreira e divergencia local */
+    sync_interval = (int)sqrt((double)cfg->num_episodes / (double)num_threads);
+else
+    /* statespace: cada thread explora todos os estados antes de sincronizar */
+    sync_interval = ql->num_states;   /* = L * C */
+\end{lstlisting}
+#+end_export
+
+A heurística =sqrt= é inspirada em limites de /regret/ para SGD paralelo:
+intervalos maiores aumentam a divergência entre tabelas locais; menores
+aumentam o overhead das barreiras. A heurística =statespace= parte da
+intuição de que cada thread deve visitar (em média) todos os estados do grid
+uma vez antes de fundir o conhecimento, promovendo exploração mais
+diversa. Além disso, testamos duas sincronizações fixas: a cada 10 episódios
+e 1000 episódios.
 
 *** HOGWILD!
 
-HOGWILD! \cite{niu2011hogwild} é um método de paralelização lock-free para
-algoritmos de gradiente estocástico (SGD): cada processador lê e escreve
-diretamente na estrutura de parâmetros compartilhada, sem locks, aceitando
-\textit{race conditions} em troca de menor overhead de sincronização.
+Ao nos depararmos com o problema da sincronização, também buscamos se
+existiam formas de fugir dela, nisso encontramos o algoritmo HOGWILD!
+\cite{niu2011hogwild} . Ele elimina toda sincronização, nesse caso
+todas as threads leem e escrevem na mesma Q-Table sem sincronização,
+aceitando /race conditions/ intencionalmente. A implementação é minimal:
 
-No contexto do Q-Learning, três propriedades tornam essa abordagem adequada:
-
-- *Esparsidade* --- cada episódio visita apenas uma fração dos estados do
-  grid, reduzindo a chance de duas threads atualizarem o mesmo $Q(s, a)$
-  simultaneamente;
-- *Escala dos updates* --- cada atualização é ponderada por $\alpha \leq
-  0{,}1$, de modo que sobrescrever um update ocasional equivale a um ruído de
-  magnitude $O(\alpha)$, negligenciável para a convergência;
-- *Simetria direcional* --- ambos os valores concorrentes são gradientes
-  válidos calculados a partir de trajetórias distintas; nenhum é
-  incorreto.
-
-A implementação em OpenMP é minimal: cada thread recebe uma cópia local da
-estrutura =QLearning= apenas para isolar o gerador de números aleatórios
-(=rand_seed=), enquanto o ponteiro =q_table= permanece apontando para a
-Q-table compartilhada. Não há barreiras, não há locks, não há seções
-críticas sobre os valores de $Q$.
-
-#+CAPTION: Implementação HOGWILD! em OpenMP (train_hogwild)
 #+begin_export latex
-\begin{lstlisting}[float=h]
+\begin{lstlisting}[caption={train\_hogwild com Q-Table compartilhada}]
 #pragma omp parallel private(episode)
 {
     int tid = omp_get_thread_num();
 
     /* Copia local apenas para rand_seed independente por thread.
-     * q_table ainda aponta para a Q-table COMPARTILHADA. */
+     * importante: q_table herda o ponteiro da struct original ---
+     * todas as threads leem/escrevem na mesma Q-Table sem nenhuma sincronizacao ou lock. */
     QLearning local_ql = *ql;
     local_ql.rand_seed = cfg->seed + (unsigned int)tid * 1000003U;
 
     #pragma omp for schedule(runtime)
     for (episode = 0; episode < cfg->num_episodes; episode++)
-        run_episode(&local_ql, episode); /* le/escreve shared sem lock */
+        run_episode(&local_ql, episode);   /* le/escreve shared sem lock */
 }
 \end{lstlisting}
 #+end_export
 
-O ponto central da implementação está na linha 6: =local_ql.q_table= não é
-copiada --- herda o ponteiro original. Assim, todos os episódios de todas as
-threads atualizam a mesma Q-table sem nenhuma coordenação explícita. O
-=schedule(runtime)= permite configurar a distribuição dos episódios em tempo
-de execução; com =dynamic=, episódios são atribuídos sob demanda, reduzindo
-a probabilidade de threads vizinhas concentrarem atualizações na mesma região
-do grid ao mesmo tempo --- alinhado com a hipótese de esparsidade do método.
+ o ponteiro é copiado por valor, continuando a apontar para a Q-Table
+original compartilhada. Apenas =rand_seed= é isolado por thread,
+garantindo trajetórias distintas sem overhead de sincronização.
+
+Três propriedades do problema justificam a corretude prática do método:
+
+- *Esparsidade*: cada episódio visita uma fração pequena dos $L \times C$
+  estados; conflitos simultâneos em $Q(s,a)$ são raros.
+- *Escala dos updates*: cada atualização é ponderada por $\alpha \leq 0{,}1$;
+  sobrescrever um update ocasional é um ruído de ordem $O(\alpha)$,
+  desprezível para a convergência.
+- *Simetria direcional*: ambos os valores concorrentes são gradientes válidos
+  calculados de trajetórias distintas; nenhum é incorreto.
+
+Importante notar que nesse caso, quanto mais esparsa a entrada, no
+nosso caso, quanto mais estados existirem, melhor performará o algoritmo.
 
 ** Metodologia Experimental
 
 O experimento adota um design fatorial completo sobre os fatores
-listados na Tabela \ref{tab:fatores}. Para cada combinação de
+listados na Tabela [[tab:fatores]]. Para cada combinação de
 parâmetros, o tempo de treinamento (medido dentro de =train()=) é
 registrado em múltiplos blocos de replicação, permitindo estimar a
 variância de tempo devida ao escalonador do sistema operacional.
 
 #+NAME: tab:fatores
 #+CAPTION: Fatores e níveis do experimento.
-#+ATTR_LATEX: :booktabs t :align lll
-| Fator             | Níveis                        | Motivação                                         |
-|-------------------+-------------------------------+---------------------------------------------------|
-| Threads           | 1, 2, 4, 8, 16, 20, 40       | Cobre desde serial até hyperthreading completo    |
-| Tamanho do grid   | 10, 50, 100                   | Espaço de estados pequeno, médio e grande         |
-| Modo de sync      | =sqrt=, =statespace=, =hogwild= | Três estratégias de paralelização                 |
-| Episódios         | 5000, 10000                   | Limiar de convergência: 5k instável, 10k estável  |
-| Densidade obst.   | 0%, 50%                       | Grid livre vs. grade com alta densidade           |
-| Schedule OpenMP   | =static=, =guided=, =dynamic=  | Políticas de distribuição de trabalho             |
-| Chunk             | 0, 1, 10                      | Granularidade do chunking para =guided=/=dynamic=  |
-| Blocos (replics.) | 1--6                          | Jitter de tempo do SO (algoritmo é determinístico)|
+#+ATTR_LATEX: :booktabs t :align lp{3.5cm}p{6cm} :center t :font \small
+| Fator           | Níveis                    | Motivação                                          |
+|-----------------+---------------------------+----------------------------------------------------|
+| Threads         | 1, 2, 4, 8, 16, 20, 40    | Cobre desde serial até hyperthreading completo     |
+| Tamanho do grid | 10, 50, 100               | Espaço de estados pequeno, médio e grande          |
+| Modo de sync    | =sqrt=, =statespace=, =hogwild= | Três estratégias de paralelização                  |
+| Episódios       | 5000, 10000               | Limiar de convergência: 5k instável, 10k estável   |
+| Densidade obst. | 0%, 50%                   | Grid livre vs. grade com alta densidade            |
+| Schedule OpenMP | =static=, =guided=, =dynamic=   | Políticas de distribuição de trabalho              |
+| Chunk           | 0, 1, 10                  | Granularidade do chunking para modo =guided/dynamic= |
+|                 |                           |                                                    |
+
 
 *** Baseline Sequencial
 
@@ -312,16 +294,12 @@ OpenMP no denominador.
 
 *** Afinidade de Threads
 
-A política de afinidade é definida de acordo com o número de threads:
+Importante notar que adotamos a política de afinidade de acordo com o número de threads:
 
-- $T \leq 20$: =OMP_PLACES=cores=, =OMP_PROC_BIND=close= --- uma thread
+- $T \leq 20$: =OMP_PLACES=cores=, =OMP_PROC_BIND=close=, uma thread
   por núcleo físico, sem hyperthreading, minimizando contenção de cache.
-- $T = 40$: =OMP_PLACES=threads=, =OMP_PROC_BIND=close= --- uma thread
+- $T = 40$: =OMP_PLACES=threads=, =OMP_PROC_BIND=close=, uma thread
   por CPU lógica, utilizando hyperthreading completo.
-
-O cluster utilizado possui nós Intel Xeon Haswell com 20 núcleos
-físicos e 40 CPUs lógicas a 2,295 GHz, alocados exclusivamente via
-SLURM.
 
 *** Medição de Tempo
 
@@ -329,7 +307,9 @@ O tempo registrado em =training_time_s= corresponde exclusivamente à
 execução de =train()=, excluindo inicialização do ambiente, alocação de
 memória e impressão de resultados. O binário paralelo usa
 =omp_get_wtime()= e o sequencial usa =clock_gettime(CLOCK_MONOTONIC)=,
-ambos medindo tempo de parede (/wall-clock/).
+ambos medindo tempo de parede (/wall-clock/). Também foi pega o tempo do
+VTUNE, entretanto não foi utilizado por demonstrar uma variabilidade
+muito maior.
 
 ** Resultados
 *** Dados                                                           :noexport:
@@ -338,66 +318,459 @@ ambos medindo tempo de parede (/wall-clock/).
   options(crayon.enabled=FALSE)
   suppressMessages(library(tidyverse))
 
+  df <- read.csv("../results/experiment-788598_20260526_171020/project_results.csv") |>
+    mutate(
+      threads = as.integer(threads),
+      config  = factor(
+        case_when(
+          sync_mode == "hogwild"                      ~ "hogwild",
+          sync_mode == "statespace"                   ~ "statespace",
+          sync_mode == "sqrt" & sync_interval == 10   ~ "every10",
+          sync_mode == "sqrt" & sync_interval == 1000 ~ "every1000",
+          TRUE                                        ~ "sqrt"
+        ),
+        levels = c("sqrt", "every10", "every1000", "statespace", "hogwild")
+      ),
+      conv = as.integer(converged == "yes")
+    )
 
-  df <- read.csv("../results/experiment-788598_20260526_171020/project_results.csv")
-  df |> glimpse()
+  # Baseline: mean sequential time per (grid_size, episodes, obstacles_pct)
+  baseline <- df |>
+    filter(threads == 1) |>
+    group_by(grid_size, episodes, obstacles_pct) |>
+    summarise(base_time_s = mean(training_time_s, na.rm=TRUE), .groups="drop")
+
+  # Aggregated means per config (averaged over schedule, chunk, obstacles, block)
+  agg <- df |>
+    filter(threads > 1) |>
+    left_join(baseline, by=c("grid_size","episodes","obstacles_pct")) |>
+    mutate(speedup = base_time_s / training_time_s) |>
+    group_by(threads, grid_size, episodes, config) |>
+    summarise(
+      mean_speedup = mean(speedup, na.rm=TRUE),
+      conv_rate    = mean(conv, na.rm=TRUE),
+      .groups = "drop"
+    )
+
+  ideal <- data.frame(threads=c(2,4,8,16,20,40), speedup=c(2,4,8,16,20,40))
+
+  # VTune data (experiment-788226, block=1 only)
+  df_vt <- read.csv("../results/experiment-788226_20260525_205541/project_results.csv") |>
+    mutate(
+      threads = as.integer(threads),
+      config  = factor(
+        case_when(
+          sync_mode == "hogwild"                      ~ "hogwild",
+          sync_mode == "statespace"                   ~ "statespace",
+          sync_mode == "sqrt" & sync_interval == 10   ~ "every10",
+          sync_mode == "sqrt" & sync_interval == 1000 ~ "every1000",
+          TRUE                                        ~ "sqrt"
+        ),
+        levels = c("sqrt", "every10", "every1000", "statespace", "hogwild")
+      )
+    ) |>
+    filter(!is.na(vtune_ipc))
 #+end_src
 
-#+RESULTS:
-#+begin_example
-Rows: 19,512
-Columns: 19
-$ threads                 <int> 20, 4, 40, 2, 4, 4, 8, 16, 4, 2, 8, 2, 2, 20, 2, 40, 40, 40, 8, 8, 2, …
-$ grid_size               <int> 50, 10, 50, 10, 50, 10, 50, 100, 10, 50, 10, 10, 100, 10, 50, 50, 10, …
-$ sync_mode               <chr> "sqrt", "sqrt", "statespace", "hogwild", "hogwild", "sqrt", "sqrt", "s…
-$ sync_interval           <int> 10, 1000, 0, 0, 0, 0, 0, 0, 0, 10, 1000, 1000, 1000, 10, 0, 10, 0, 0, …
-$ episodes                <int> 10000, 10000, 5000, 10000, 10000, 5000, 5000, 5000, 5000, 10000, 10000…
-$ schedule                <chr> "static", "guided", "guided", "dynamic", "dynamic", "static", "dynamic…
-$ chunk                   <int> 1, 0, 0, 1, 1, 0, 10, 0, 1, 0, 10, 0, 1, 1, 1, 0, 0, 1, 10, 10, 0, 10,…
-$ obstacles_pct           <int> 50, 0, 0, 0, 0, 50, 0, 0, 0, 50, 0, 0, 0, 50, 0, 0, 50, 50, 0, 50, 50,…
-$ block                   <int> 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1…
-$ training_time_s         <dbl> 0.564461, 0.002911, 0.018789, 0.006129, 0.022150, 0.003878, 0.059202, …
-$ converged               <chr> "no", "yes", "no", "yes", "yes", "yes", "no", "no", "yes", "no", "yes"…
-$ vtune_elapsed_s         <lgl> NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA…
-$ vtune_ipc               <lgl> NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA…
-$ vtune_mem_bound_pct     <lgl> NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA…
-$ thread_cpu_time_s       <lgl> NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA…
-$ thread_wait_time_s      <lgl> NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA…
-$ thread_spin_time_s      <lgl> NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA…
-$ thread_overhead_time_s  <lgl> NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA…
-$ thread_eff_cpu_util_pct <lgl> NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA…
-#+end_example
+*** Speedup e Eficiência
 
-*** Speedup por Tamanho de Bloco
+O speedup médio por número de threads e modo de sincronização está
+apresentado na Figura [[fig:speedup]]. O eixo tracejado representa
+o speedup ideal (linear). Para grids 10x10, o speedup satura rapidamente
+em torno de 4--5x a partir de 8 threads, indicando que o trabalho por
+thread é insuficiente para amortizar o overhead de sincronização. Para
+grids maiores (100x100), o HOGWILD! atinge speedup médio de até 17x com
+40 threads, enquanto os modos com sincronização (\textit{sqrt},
+\textit{statespace}) ficam abaixo de 10x. A diferença se deve ao fato de
+que os modos sincronizados impõem barreiras periódicas que serializam
+parcialmente a execução.
 
-#+begin_src R :session r :exports results :results graphics file :file speedup_blocks.pdf :width 6 :height 7
-library(ggplot2)
+#+begin_src R :session r :exports results :results graphics file :file speedup_blocks.pdf :width 5 :height 3
+  library(ggplot2)
 
-ggplot(agg, aes(x=threads, y=speedup, color=sync_mode, shape=sync_mode)) +
-  geom_line() +
-  geom_point(size=1.5) +
-  geom_line(data=ideal, aes(x=threads, y=speedup),
-            color="gray70", linetype="dashed", inherit.aes=FALSE) +
-  facet_wrap(~block, ncol=3) +
-  scale_x_continuous(breaks=c(2,4,8,16,20,40)) +
-  labs(x="Threads", y="Speedup", color=NULL, shape=NULL) +
-  theme_classic(base_size=8) +
-  theme(legend.position="bottom", strip.background=element_blank())
+  ggplot(agg |> filter(episodes == 10000),
+         aes(x=as.factor(threads), y=mean_speedup,
+             color=config, shape=config, group=config)) +
+    geom_line(data=ideal, aes(x=as.factor(threads), y=speedup, group=1),
+              color="gray60", linetype="dashed", inherit.aes=FALSE) +
+    geom_line() +
+    geom_point(size=2) +
+    facet_wrap(~grid_size, ncol=3,
+               labeller=as_labeller(c(`10`="10x10",`50`="50x50",`100`="100x100"))) +
+    labs(x="Threads", y="Speedup", color=NULL, shape=NULL) +
+    theme_bw(base_size=9) +
+    theme(legend.position="bottom", strip.background=element_blank())
 #+end_src
 
+#+NAME: fig:speedup
+#+CAPTION: Speedup médio por modo de sincronização (10k episódios). Tracejado = ideal linear.
 #+RESULTS:
 [[file:speedup_blocks.pdf]]
 
+A eficiência paralela ($S(T)/T$) é mostrada na Figura [[fig:efficiency]].
+No grid 10x10, vários modos apresentam eficiência acima de 100%,
+possivelmente por efeitos de cache com múltiplos núcleos acessando
+partições distintas da Q-Table. Ainda assim, a eficiência colapsa
+rapidamente: nenhuma configuração sustenta 50% além de 8 threads neste
+grid, resultado consistente com o tráfego de coerência de cache
+discutido na Seção de Análise de Cache.
+
+Para grids maiores, o HOGWILD! mantém a melhor eficiência em todos os
+tamanhos: cerca de 35--45% com 40 threads no grid 100x100, enquanto
+os demais modos ficam abaixo de 15%. Entre os modos sincronizados,
+o \textit{every10} (sincronização a cada 10 episódios) apresenta a pior
+eficiência. O overhead de barreiras frequentes supera o ganho da
+convergência mais rápida. O \textit{every1000} e o \textit{statespace}
+mantêm eficiência intermediária, pois sincronizam com menos frequência
+e amortizam o custo das barreiras sobre mais trabalho útil.
+
+#+begin_src R :session r :exports results :results graphics file :file efficiency.pdf :width 6 :height 3
+  library(ggplot2)
+
+  ggplot(agg |> filter(episodes == 10000),
+         aes(x=as.factor(threads), y=mean_speedup / threads,
+             color=config, shape=config, group=config)) +
+    geom_hline(yintercept=1, linetype="dashed", color="gray60") +
+    geom_line() +
+    geom_point(size=2) +
+    facet_wrap(~grid_size, ncol=3,
+               labeller=as_labeller(c(`10`="10x10",`50`="50x50",`100`="100x100"))) +
+    scale_y_continuous(labels=scales::percent_format()) +
+    labs(x="Threads", y="Eficiência  S(T)/T", color=NULL, shape=NULL) +
+    theme_bw(base_size=9) +
+    theme(legend.position="bottom", strip.background=element_blank())
+#+end_src
+
+#+NAME: fig:efficiency
+#+CAPTION: Eficiência paralela por modo de sincronização (10k episódios). Ideal = 100% (tracejado).
+#+RESULTS:
+[[file:efficiency.pdf]]
+
+*** Análise de Cache (10x10)
+
+Uma coisa que procuramos entender mais a fundo foi a perda do speedup
+no grid 10x10 após 8 threads. Para isso usamos o =perf stat= (eventos
+=L1-dcache-load-misses=, =LLC-loads= e =LLC-load-misses=) para todas as
+combinações de modo de sync-mode e schedule com 10k episódios pois o
+vtune apresentou erros de versão. A Q-Table do grid 10x10 ocupa
+aproximadamente 3,2 KB (100 estados $\times$ 4 ações $\times$ 8 bytes), cabendo
+inteiramente em L1 (32 KB) de qualquer núcleo.
+
+Para $T \leq 8$, a taxa de LLC-miss (misses no último nível da cache,
+normalmente L3) permanece abaixo de 1,2% em todos os modos. No
+intervalo $T \in [8, 16]$, a taxa explode para 23--40% (Tabela
+[[tab:llc]]). Com 16 ou mais threads competindo pelas mesmas poucas linhas
+de cache da Q-Table global, acontecem mais cache misses.
+
+#+NAME: tab:llc
+#+CAPTION: Taxa de LLC-miss por threads e modo de sync (média dos três schedules, grid 10x10, 10k ep.).
+#+ATTR_LATEX: :booktabs t :align rrrr :center t :font \small
+| Threads | sqrt  | statespace | hogwild |
+|---------+-------+------------+---------|
+|       2 | 0,80% | 1,11%      | 0,44%   |
+|       4 | 0,70% | 0,79%      | 0,18%   |
+|       8 | 0,17% | 0,18%      | 0,11%   |
+|---------+-------+------------+---------|
+|      16 | 30,9% | 23,1%      | 36,7%   |
+|      20 | 29,1% | 22,9%      | 36,4%   |
+|      40 | 40,7% | 28,5%      | 35,9%   |
+
+Com poucos threads ($T \leq 8$), o hogwild apresenta LLC-miss
+\emph{menor} que os modos sincronizados: com uma única Q-Table
+compartilhada de 3,2 KB, os dois (ou quatro, ou oito) núcleos tendem a
+manter a tabela nas caches L1/L2 sem competição. Os modos com Q-Tables
+locais (sqrt, statespace) têm cópias separadas por thread, aumentando
+o footprint total e gerando mais tráfego de LLC.  A partir de $T =
+16$, o quadro se inverte: hogwild tende a ter mais LLC-miss (36,7\%)
+porque cada escrita invalida a linha de cache nos demais núcleos,
+enquanto statespace, com intervalo de sincronização mais longo ($=
+100$ episódios para o grid 10x10), mantém as Q-Tables locais isoladas
+por mais tempo, chegando a apenas 23,1\%.
+
+Em todos os modos, o ponto de ruptura de LLC-miss em $T \in [8, 16]$
+confirma que o gargalo do grid 10x10 com muitas threads é tráfego e de
+cache, não escassez de trabalho por thread.
+
+*** Análise VTune
+
+O Intel VTune Profiler foi utilizado no modo \textit{performance-snapshot}
+para coletar IPC (\textit{Instructions Per Cycle}) e percentual de
+\textit{Memory Bound} por configuração (Figura [[fig:vtune]]).
+
+#+begin_src R :session r :exports results :results graphics file :file vtune.pdf :width 6 :height 5
+  library(ggplot2)
+  library(patchwork)
+
+  summ_vt <- df_vt |>
+    group_by(threads, config, grid_size) |>
+    summarise(ipc     = mean(vtune_ipc,          na.rm=TRUE),
+              membnd  = mean(vtune_mem_bound_pct, na.rm=TRUE),
+              .groups = "drop")
+
+  gs_labels <- c(`10`="10x10", `50`="50x50", `100`="100x100")
+
+  p1 <- ggplot(summ_vt, aes(x=as.factor(threads), y=ipc,
+                             color=config, shape=config, group=config)) +
+    geom_line() + geom_point(size=2) +
+    facet_wrap(~grid_size, ncol=3, labeller=as_labeller(gs_labels)) +
+    labs(x=NULL, y="IPC", color=NULL, shape=NULL) +
+    theme_bw(base_size=9) +
+    theme(legend.position="none", strip.background=element_blank())
+
+  p2 <- ggplot(summ_vt, aes(x=as.factor(threads), y=membnd,
+                             color=config, shape=config, group=config)) +
+    geom_line() + geom_point(size=2) +
+    facet_wrap(~grid_size, ncol=3, labeller=as_labeller(gs_labels)) +
+    labs(x="Threads", y="Memory Bound (%)", color=NULL, shape=NULL) +
+    theme_bw(base_size=9) +
+    theme(legend.position="bottom", strip.background=element_blank())
+
+  print(p1 / p2)
+#+end_src
+
+#+NAME: fig:vtune
+#+CAPTION: IPC (topo) e Memory Bound % (baixo) por modo de sincronização e tamanho de grid.
+#+RESULTS:
+[[file:vtune.pdf]]
+
+IPC decai com o número de threads em todos os cenários. Isso é
+esperado pois IPC mede eficiência de execução por thread, e mais
+threads aumentam a contenção por cache e barramento sem aumentar o
+throughput individual. Além disso, ao ativar o hyperthreading, dois
+threads lógicos compartilham o mesmo núcleo físico, pressionando ainda
+mais a cache. O conjunto de linhas de cache ativas dobra sem aumentar
+a capacidade do L1. Ainda no tópico do grid 10x10, vemos um alto
+Memory Bound e baixo IPC, reforçando o que foi visto na análise das
+cache. Esse tamanho faz com que múltiplas threads atualizem um
+conjunto muito restrito de linhas de cache com alta frequência.
+
+*** Análise de fatores de menor impacto
+
+Além do modo de sincronização, o experimento variou o schedule do
+OpenMP (static, dynamic, guided), o tamanho de chunk (auto, 1, 10) e a
+densidade de obstáculos (0%, 50%). Os efeitos desses fatores concretos
+no tempo de execução e speedup não foi significativo. Os efeitos são
+analisados abaixo para o grid 100x100 com 10k episódios.
+
+*Schedule e chunk.* A Figura [[fig:sched]] mostra o speedup médio por
+schedule, separado por tamanho de chunk e grid. Os três schedules
+produzem speedup praticamente idêntico: as durações de episódio são
+homogêneas e qualquer distribuição de carga é equilibrada. A diferença
+geral permanece pequena (<2% no speedup médio), indicando que o
+schedule não é o fator dominante. O chunk tem impacto igualmente
+pequeno.
+
+#+begin_src R :session r :exports results :results graphics file :file sched_impact.pdf :width 6 :height 5
+  df_sp <- df |>
+    filter(threads > 1) |>
+    left_join(baseline, by=c("grid_size","episodes","obstacles_pct")) |>
+    mutate(speedup = base_time_s / training_time_s,
+           chunk_label = factor(chunk, levels=c(0,1,10),
+                                labels=c("auto","1","10")))
+
+  sched_agg <- df_sp |>
+    filter(episodes == 10000) |>
+    group_by(threads, schedule, chunk_label, grid_size) |>
+    summarise(mean_sp = mean(speedup, na.rm=TRUE), .groups="drop") |>
+    mutate(grid_label = factor(paste0(grid_size,"x",grid_size),
+                               levels=c("10x10","50x50","100x100")))
+
+  ggplot(sched_agg,
+         aes(x=as.factor(threads), y=mean_sp,
+             color=schedule, shape=schedule, group=schedule)) +
+    geom_line() + geom_point(size=2) +
+    facet_grid(grid_label ~ chunk_label, scales="free_y") +
+    labs(x="Threads", y="Speedup medio", color=NULL, shape=NULL) +
+    theme_bw(base_size=9) +
+    theme(legend.position="bottom", strip.background=element_blank())
+#+end_src
+
+#+NAME: fig:sched
+#+CAPTION: Speedup medio por schedule, separado por chunk e grid (10k ep., media sobre obstacles e sync-mode).
+#+RESULTS:
+[[file:sched_impact.pdf]]
+
+*Densidade de obstáculos.* A Figura [[fig:obs_speedup]] mostra o
+tempo de treinamento absoluto para 0% e 50% de obstáculos. Com 50%
+de obstáculos, o agente nunca encontra o objetivo e cada episódio
+percorre todos os =max_steps= passos, tornando o tempo sequencial
+muito maior. É importante notar que comparar speedup entre as duas
+densidades seria injusto: o ganho aparente com 50% de obstáculos
+reflete apenas que há mais trabalho total a dividir entre as threads
+--- não que o algoritmo paralelo seja mais eficiente. O gráfico de
+tempo absoluto deixa claro que ambas as versões (0% e 50%) escalam
+de forma semelhante com mais threads, mas partem de baselines
+completamente diferentes.
+
+#+begin_src R :session r :exports results :results graphics file :file obs_speedup.pdf :width 6 :height 3
+  library(ggplot2)
+
+  # Sequential baseline (threads == 1)
+  obs_seq <- df |>
+    filter(threads == 1, episodes == 10000) |>
+    group_by(grid_size, obstacles_pct) |>
+    summarise(mean_time = mean(training_time_s, na.rm=TRUE), .groups="drop") |>
+    mutate(
+      obs_label = factor(paste0(obstacles_pct, "% obs."),
+                         levels=c("0% obs.","50% obs.")),
+      grid_label = factor(paste0(grid_size, "x", grid_size),
+                          levels=c("10x10","50x50","100x100"))
+    )
+
+  # Parallel lines (threads > 1)
+  obs_par <- df |>
+    filter(threads > 1, episodes == 10000) |>
+    group_by(threads, grid_size, obstacles_pct) |>
+    summarise(mean_time = mean(training_time_s, na.rm=TRUE), .groups="drop") |>
+    mutate(
+      obs_label = factor(paste0(obstacles_pct, "% obs."),
+                         levels=c("0% obs.","50% obs.")),
+      grid_label = factor(paste0(grid_size, "x", grid_size),
+                          levels=c("10x10","50x50","100x100"))
+    )
+
+  ggplot() +
+    geom_col(data=obs_seq,
+             aes(x="1", y=mean_time, fill=obs_label),
+             position=position_dodge(width=0.7), width=0.6, alpha=0.7) +
+    geom_line(data=obs_par,
+              aes(x=as.factor(threads), y=mean_time,
+                  color=obs_label, group=obs_label)) +
+    geom_point(data=obs_par,
+               aes(x=as.factor(threads), y=mean_time,
+                   color=obs_label, shape=obs_label), size=2) +
+    facet_wrap(~grid_label, ncol=3, scales="free_y") +
+    scale_x_discrete(limits=c("1","2","4","8","16","20","40")) +
+    scale_fill_manual(values=c("0% obs."="#F8766D","50% obs."="#00BFC4")) +
+    scale_color_manual(values=c("0% obs."="#F8766D","50% obs."="#00BFC4")) +
+    labs(x="Threads", y="Tempo de treino (s)", fill=NULL, color=NULL, shape=NULL) +
+    theme_bw(base_size=9) +
+    theme(legend.position="bottom", strip.background=element_blank())
+#+end_src
+
+#+NAME: fig:obs_speedup
+#+CAPTION: Tempo de treino por densidade de obstáculos (10k ep., media sobre configs e schedules). Barra = sequencial (1 thread), linhas = paralelo.
+#+RESULTS:
+[[file:obs_speedup.pdf]]
+
+*** Convergência
+
+A Figura [[fig:conv_obs]] apresenta a taxa de convergência em função
+do número de threads, separada por densidade de obstáculos, para o grid
+100x100 com 10k episódios. Com 0% de obstáculos, todos os modos
+convergem razoavelmente para poucos threads, mas degradam com o aumento
+do paralelismo. Com 50% de obstáculos, com exceção do pequeno grid
+10x10, nenhum dos outros convergiu.
+
+#+begin_src R :session r :exports results :results graphics file :file conv_obstacles.pdf :width 6 :height 4
+  library(ggplot2)
+
+  df_conv_obs <- df |>
+    filter(episodes == 10000) |>
+    group_by(threads, obstacles_pct, config, grid_size) |>
+    summarise(conv_rate = mean(conv, na.rm=TRUE), .groups="drop") |>
+    mutate(
+      obs_label = ifelse(obstacles_pct == 0, "0% obstáculos", "50% obstáculos"),
+      grid_label = paste0(grid_size, "x", grid_size)
+    )
+
+  ggplot(df_conv_obs,
+         aes(x=as.factor(threads), y=conv_rate,
+             color=config, shape=config, group=config)) +
+    geom_line() +
+    geom_point(size=2) +
+    facet_grid(obs_label ~ grid_label) +
+    scale_y_continuous(limits=c(0, 1), labels=scales::percent_format()) +
+    labs(x="Threads", y="Taxa de convergência", color=NULL, shape=NULL) +
+    theme_bw(base_size=9) +
+    theme(legend.position="bottom", strip.background=element_blank())
+#+end_src
+
+#+NAME: fig:conv_obs
+#+CAPTION: Taxa de convergência por modo de sincronização e densidade de obstáculos (10k ep.).
+#+RESULTS:
+[[file:conv_obstacles.pdf]]
+
+A causa da degradação nos modos sincronizados é a \textbf{divisão de
+episódios}: com $T$ threads e $E$ episódios totais, cada thread treina
+com apenas $E/T$ episódios. Quando $E/T$ cai abaixo do limiar mínimo de
+convergência $E_{\min}$ do problema, o agente não acumula experiência
+suficiente para aprender uma política válida. Esse limiar é mais alto
+com 50% de obstáculos, pois o agente precisa explorar trajetórias mais
+longas até encontrar o objetivo, exigindo mais episódios para propagar
+valores Q corretos a todos os estados relevantes.
+
+Mesmo o HOGWILD! usando uma Q-Table compartilhada, que em teoria
+acumula atualizações de \textit{todos} os threads simultaneamente não
+foi capaz de convergir nesses casos com muitos obstáculos. Isso nos
+diz que apenas uma boa heurística não é o suficiente para o problema
+convergir, também é necessário aumentar o tamanho do problema.
+
+*** Speedup das Configurações Convergidas
+
+A tabela a seguir apresenta o speedup médio considerando apenas as
+execuções que convergiram (10k episódios). Células vazias indicam que
+nenhuma execução da combinação convergiu.
+
+#+begin_src R :session r :exports results :results output latex
+  library(knitr)
+  library(tidyr)
+
+  conv_sp <- df |>
+    filter(threads > 1, converged == "yes", episodes == 10000) |>
+    left_join(baseline, by=c("grid_size","episodes","obstacles_pct")) |>
+    mutate(speedup = base_time_s / training_time_s) |>
+    group_by(grid_size, config, threads) |>
+    summarise(mean_speedup = round(mean(speedup, na.rm=TRUE), 2), .groups="drop") |>
+    pivot_wider(names_from=threads, values_from=mean_speedup,
+                names_prefix="T", names_sort=TRUE) |>
+    arrange(grid_size, config) |>
+    mutate(Grid = paste0(grid_size, "x", grid_size), .before=config) |>
+    select(-grid_size) |>
+    rename(Config=config)
+
+  kable(conv_sp, format="latex", booktabs=TRUE,
+        col.names=c("Grid", "Config", "2", "4", "8", "16", "20", "40"),
+        linesep="",
+        caption="Speedup medio apenas para execucoes convergidas (10k episodios). Celulas vazias: nenhuma execucao convergiu nessa combinacao.")
+#+end_src
+
+#+RESULTS:
+
 ** Conclusão
 
-** Agradecimentos
-:PROPERTIES:
-:UNNUMBERED: t
-:END:
+Este trabalho paralelizou o Q-Learning por episódios usando OpenMP com
+diferentes estratégias e heurísticas.
 
-Who paid for this?
+O principal limitante de convergência identificado foi a divisão de
+episódios. com $T$ threads e $E$ episódios fixos, cada thread treina
+com apenas $E/T$ episódios. Quando esse valor cai abaixo do limiar
+mínimo do problema, o agente não aprende uma política válida. A
+sincronização e as heurísticas selecionadas conseguem fazer o cenário
+ficar favorável, mas ainda não garantem precisão. Com 50% de
+obstáculos, nenhuma configuração paralela convergiu para mapas
+"grandes", incluindo o HOGWILD!, que embora acumule updates de todas
+as threads, sofre com race conditions que corrompem o aprendizado em
+ambientes densos.
 
-** Referenrências                                                   :ignore:
+Em grids pequenos (10x10), o gargalo é diferente: a Q-Table cabe em
+L1, mas com grande quantidade de threads, ocorrem invalidações de
+coerência de cache que saturam o LLC e degradam IPC e speedup
+independentemente do modo de sincronização.
+
+O HOGWILD! obteve o maior speedup bruto (até 17x com 40 threads em
+grids grandes), beneficiando-se da ausência de barreiras e do acesso
+esparso à Q-Table em grids 100x100. Os modos sincronizados com
+intervalos longos (every1000, statespace) mostraram
+melhor comportamento de cache por manter Q-Tables locais isoladas por
+mais tempo entre syncs, mas demonstrarão pior conversão.
+
+O benefício prático do paralelismo está na redução do tempo de
+treinamento para um orçamento fixo de episódios, em cenários onde esse
+orçamento dividido é suficiente para o tamanho e complexidade do
+problema.
+
+** Referências                                                      :ignore:
 
 # See next section to understand how refs.bib file is created.
 bibliographystyle:sbc.bst
@@ -426,6 +799,6 @@ Tangle this file with C-c C-v t
 # eval: (add-to-list 'org-latex-packages-alist '("" "url") t)
 # eval: (add-to-list 'org-latex-packages-alist '("" "sbc-template") t)
 # eval: (add-to-list 'org-latex-packages-alist '("AUTO" "babel" t ("pdflatex")))
-# eval: (setq org-latex-pdf-process (list "latexmk -pdf %f"))
+# eval: (setq org-latex-pdf-process (list "latexmk -pdf -bibtex %f"))
 # eval: (add-to-list 'org-export-before-processing-hook (lambda (be) (org-babel-tangle)))
 # End:
