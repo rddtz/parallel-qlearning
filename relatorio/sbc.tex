@@ -47,7 +47,7 @@
 
 \maketitle
 \section{Algoritmo e Problema}
-\label{sec:orga066378}
+\label{sec:orgcfa6d99}
 
 O Q-Learning é um método de aprendizado por reforço que treina um
 agente por meio de episódios. Em cada episódio, o agente parte do
@@ -109,10 +109,10 @@ descrever o comportamento completo da aplicação sequencial.
 \end{algorithmic}
 \end{algorithm}
 \section{Paralelização}
-\label{sec:orgab3f286}
+\label{sec:org36fb564}
 
 \subsection{Escolha do Nível de Paralelismo}
-\label{sec:org154b388}
+\label{sec:orgf4b6894}
 
 Quando paramos para discutir como paralelizar, tivemos três ideias:
 
@@ -143,7 +143,7 @@ sequencialmente com 2500 episódios, pensando nesse problema tivemos
 que implementar sincronização ao código, limitando o potencial
 paralelo.
 \subsection{Sincronização no treino}
-\label{sec:org4f301e0}
+\label{sec:orgb346b31}
 
 Cada thread mantém uma Q-Table local e executa um lote de episódios de
 forma autônoma. Ao final de cada lote (\emph{chunk} de \texttt{sync\_interval}
@@ -217,7 +217,7 @@ uma vez antes de fundir o conhecimento, promovendo exploração mais
 diversa. Além disso, testamos duas sincronizações fixas: a cada 10 episódios
 e 1000 episódios.
 \subsection{HOGWILD!}
-\label{sec:orga3e7664}
+\label{sec:orgde7dcd4}
 
 Ao nos depararmos com o problema da sincronização, também buscamos se
 existiam formas de fugir dela, nisso encontramos o algoritmo HOGWILD!
@@ -261,16 +261,16 @@ calculados de trajetórias distintas; nenhum é incorreto.
 Importante notar que nesse caso, quanto mais esparsa a entrada, no
 nosso caso, quanto mais estados existirem, melhor performará o algoritmo.
 \section{Metodologia Experimental}
-\label{sec:orge127706}
+\label{sec:org53b1e5b}
 
 O experimento adota um design fatorial completo sobre os fatores
-listados na Tabela \ref{tab:org606d7ed}. Para cada combinação de
+listados na Tabela \ref{tab:org8f369ab}. Para cada combinação de
 parâmetros, o tempo de treinamento (medido dentro de \texttt{train()}) é
 registrado em múltiplos blocos de replicação, permitindo estimar a
 variância de tempo devida ao escalonador do sistema operacional.
 
 \begin{table}[htbp]
-\caption{\label{tab:org606d7ed}Fatores e níveis do experimento.}
+\caption{\label{tab:org8f369ab}Fatores e níveis do experimento.}
 \centering
 \small
 \begin{tabular}{lp{3.5cm}p{6cm}}
@@ -289,14 +289,14 @@ Chunk & 0, 1, 10 & Granularidade do chunking para modo \texttt{guided/dynamic}\\
 \end{tabular}
 \end{table}
 \subsection{Baseline Sequencial}
-\label{sec:org005d6d2}
+\label{sec:org9168f76}
 
 Linhas com \texttt{threads=1} invocam o binário sequencial puro, sem runtime
 OpenMP. Isso garante que o speedup seja calculado contra o tempo real
 do algoritmo, sem incluir o overhead de criação do pool de threads do
 OpenMP no denominador.
 \subsection{Afinidade de Threads}
-\label{sec:org3a16c60}
+\label{sec:orgd70a030}
 
 Importante notar que adotamos a política de afinidade de acordo com o número de threads:
 
@@ -307,7 +307,7 @@ por núcleo físico, sem hyperthreading, minimizando contenção de cache.
 por CPU lógica, utilizando hyperthreading completo.
 \end{itemize}
 \subsection{Medição de Tempo}
-\label{sec:orgb042d3d}
+\label{sec:org1b36bdc}
 
 O tempo registrado em \texttt{training\_time\_s} corresponde exclusivamente à
 execução de \texttt{train()}, excluindo inicialização do ambiente, alocação de
@@ -317,12 +317,12 @@ ambos medindo tempo de parede (\emph{wall-clock}). Também foi pega o tempo do
 VTUNE, entretanto não foi utilizado por demonstrar uma variabilidade
 muito maior.
 \section{Resultados}
-\label{sec:orge0f2c2e}
+\label{sec:org3e8794b}
 \subsection{Speedup e Eficiência}
-\label{sec:org7703b39}
+\label{sec:org3234da1}
 
 O speedup médio por número de threads e modo de sincronização está
-apresentado na Figura \ref{fig:org64b10ad}. O eixo tracejado representa
+apresentado na Figura \ref{fig:orgb75c4f7}. O eixo tracejado representa
 o speedup ideal (linear). Para grids 10x10, o speedup satura rapidamente
 em torno de 4--5x a partir de 8 threads, indicando que o trabalho por
 thread é insuficiente para amortizar o overhead de sincronização. Para
@@ -335,10 +335,10 @@ parcialmente a execução.
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=.9\linewidth]{speedup_blocks.pdf}
-\caption{\label{fig:org64b10ad}Speedup médio por modo de sincronização (10k episódios). Tracejado = ideal linear.}
+\caption{\label{fig:orgb75c4f7}Speedup médio por modo de sincronização (10k episódios). Tracejado = ideal linear.}
 \end{figure}
 
-A eficiência paralela (\(S(T)/T\)) é mostrada na Figura \ref{fig:org474e88a}.
+A eficiência paralela (\(S(T)/T\)) é mostrada na Figura \ref{fig:org8213673}.
 No grid 10x10, vários modos apresentam eficiência acima de 100\%,
 possivelmente por efeitos de cache com múltiplos núcleos acessando
 partições distintas da Q-Table. Ainda assim, a eficiência colapsa
@@ -358,70 +358,132 @@ e amortizam o custo das barreiras sobre mais trabalho útil.
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=.9\linewidth]{efficiency.pdf}
-\caption{\label{fig:org474e88a}Eficiência paralela por modo de sincronização (10k episódios). Ideal = 100\% (tracejado).}
+\caption{\label{fig:org8213673}Eficiência paralela por modo de sincronização (10k episódios). Ideal = 100\% (tracejado).}
 \end{figure}
 \subsection{Análise de Cache (10x10)}
-\label{sec:orgbec793a}
+\label{sec:org9fe480c}
 
 Uma coisa que procuramos entender mais a fundo foi a perda do speedup
 no grid 10x10 após 8 threads. Para isso usamos o \texttt{perf stat} (eventos
 \texttt{L1-dcache-load-misses}, \texttt{LLC-loads} e \texttt{LLC-load-misses}) para todas as
-combinações de modo de sync-mode e schedule com 10k episódios pois o
-vtune apresentou erros de versão. A Q-Table do grid 10x10 ocupa
-aproximadamente 3,2 KB (100 estados \(\times\) 4 ações \(\times\) 8 bytes), cabendo
-inteiramente em L1 (32 KB) de qualquer núcleo.
-
-Para \(T \leq 8\), a taxa de LLC-miss (misses no último nível da cache,
-normalmente L3) permanece abaixo de 1,2\% em todos os modos. No
-intervalo \(T \in [8, 16]\), a taxa explode para 23--40\% (Tabela
-\ref{tab:org9eb5d09}). Com 16 ou mais threads competindo pelas mesmas poucas linhas
-de cache da Q-Table global, acontecem mais cache misses.
+combinações de sync-mode e schedule com 10k episódios pois o vtune
+apresentou erros de versão. A Q-Table do grid 10x10 ocupa apenas 3,2 KB
+(100 estados \(\times\) 4 ações \(\times\) 8 bytes), cabendo inteiramente em L1
+(32 KB). O baseline sequencial confirma isso com apenas 0,18\% de
+L1-miss.
 
 \begin{table}[htbp]
-\caption{\label{tab:org9eb5d09}Taxa de LLC-miss por threads e modo de sync (média dos três schedules, grid 10x10, 10k ep.).}
+\caption{\label{tab:org0317c3a}L1-miss e LLC-miss por threads e modo de sync (media dos tres schedules, grid 10x10, 10k ep.).}
 \centering
 \small
-\begin{tabular}{rrrr}
+\begin{tabular}{rrrrrrr}
 \toprule
-Threads & sqrt & statespace & hogwild\\
+Threads & sq-L1 & sq-LLC & spc-L1 & spc-LLC & hog-L1 & hog-LLC\\
 \midrule
-2 & 0,80\% & 1,11\% & 0,44\%\\
-4 & 0,70\% & 0,79\% & 0,18\%\\
-8 & 0,17\% & 0,18\% & 0,11\%\\
+2 & 1,12\% & 0,80\% & 1,10\% & 1,11\% & 7,42\% & 0,44\%\\
+4 & 3,87\% & 0,70\% & 4,10\% & 0,79\% & 8,53\% & 0,18\%\\
+8 & 6,37\% & 0,17\% & 5,15\% & 0,18\% & 23,20\% & 0,11\%\\
 \midrule
-16 & 30,9\% & 23,1\% & 36,7\%\\
-20 & 29,1\% & 22,9\% & 36,4\%\\
-40 & 40,7\% & 28,5\% & 35,9\%\\
+16 & 3,95\% & 30,9\% & 4,64\% & 23,1\% & 5,99\% & 36,7\%\\
+20 & 5,08\% & 29,1\% & 11,09\% & 22,9\% & 1,38\% & 36,4\%\\
+40 & 1,99\% & 40,7\% & 1,98\% & 28,5\% & 4,17\% & 35,9\%\\
 \bottomrule
 \end{tabular}
 \end{table}
 
-Com poucos threads (\(T \leq 8\)), o hogwild apresenta LLC-miss
-\emph{menor} que os modos sincronizados: com uma única Q-Table
-compartilhada de 3,2 KB, os dois (ou quatro, ou oito) núcleos tendem a
-manter a tabela nas caches L1/L2 sem competição. Os modos com Q-Tables
-locais (sqrt, statespace) têm cópias separadas por thread, aumentando
-o footprint total e gerando mais tráfego de LLC.  A partir de \(T =
-16\), o quadro se inverte: hogwild tende a ter mais LLC-miss (36,7$\backslash$%)
-porque cada escrita invalida a linha de cache nos demais núcleos,
-enquanto statespace, com intervalo de sincronização mais longo (\(=
-100\) episódios para o grid 10x10), mantém as Q-Tables locais isoladas
-por mais tempo, chegando a apenas 23,1$\backslash$%.
+As máquinas hype tem um dual-socket (2x Intel Xeon E5-2650 v3, 10
+núcleos por socket). Com \texttt{OMP\_PLACES=cores} e \texttt{OMP\_PROC\_BIND=close}, os
+threads são alocados em núcleos consecutivos: \(T \leq 10\) ficam
+inteiramente no socket\textasciitilde{}0; \(T = 16\) já usa 10 núcleos do socket\textasciitilde{}0 e 6
+do socket\textasciitilde{}1.
 
-Em todos os modos, o ponto de ruptura de LLC-miss em \(T \in [8, 16]\)
-confirma que o gargalo do grid 10x10 com muitas threads é tráfego e de
-cache, não escassez de trabalho por thread.
+Para \(T \leq 8\), hogwild apresenta L1-miss elevado (7--23\%) mas LLC-miss
+abaixo de 0,5\% (Tabela \ref{tab:org0317c3a}): cada escrita na Q-Table compartilhada
+invalida a linha de cache nos demais núcleos, forçando recargas de
+L2/L3, mas os dados são encontrados antes do LLC. Os modos
+sincronizados (sqrt, statespace) mantêm L1-miss baixo (\(\leq 6,4\%\)) pois
+cada thread opera em cópia local sem invalidações.
+
+A partir de \(T = 16\), threads do socket 1 passam a acessar a Q-Table
+alocada na memória do socket 0 para o hogwild. O que aparece como
+LLC-miss no L3 local do socket 1. Para o hogwild esse custo é pago em
+cada acesso, pois não há cópia local: daí os 36,7\% de LLC-miss.  Para
+statespace, os threads do socket 1 carregam a cópia local uma vez e a
+reutilizam por 100 episódios antes do próximo merge, amortizando os
+misses e chegando a apenas 23,1\%.
+
+Em todos os modos, a fronteira entre socket 0 e socket 1 é o ponto de
+ruptura do LLC-miss, confirmando que o gargalo do grid 10x10 com
+muitas threads é tráfego de cache, não escassez de
+trabalho por thread.
+\subsection{Análise de Cache (100x100)}
+\label{sec:orgc84981b}
+
+A Q-Table do grid 100x100 ocupa 320 KB (\(10^4\) estados \(\times\) 4 ações
+\(\times\) 8 bytes), excedendo o L1 (32 KB) e o L2 (\(\approx\)256 KB) mas
+cabendo no LLC (20 MB). O baseline sequencial já exibe 2,82\%
+de L1-miss (vs. 0,18\% no grid 10x10), confirmando que a tabela
+transborda o L1 desde o início.
+
+\begin{table}[htbp]
+\caption{\label{tab:org04378e1}L1-miss e LLC-miss por threads e modo de sync (media dos tres schedules, grid 100x100, 10k ep.).}
+\centering
+\scriptsize
+\begin{tabular}{rrrrrrrrr}
+\toprule
+Threads & sq-L1 & sq-LLC & ev1k-L1 & ev1k-LLC & spc-L1 & spc-LLC & hog-L1 & hog-LLC\\
+\midrule
+2 & 5,63\% & 0,06\% & 3,39\% & 0,08\% & 3,28\% & 0,08\% & 4,50\% & 0,00\%\\
+4 & 6,27\% & 0,12\% & 2,91\% & 0,29\% & 2,62\% & 0,05\% & 4,30\% & 0,00\%\\
+8 & 7,80\% & 0,01\% & 2,64\% & 0,04\% & 2,09\% & 0,05\% & 5,41\% & 0,20\%\\
+\midrule
+16 & 11,79\% & 7,01\% & 1,98\% & 3,12\% & 2,18\% & 1,59\% & 4,36\% & 35,44\%\\
+20 & 12,85\% & 22,43\% & 2,83\% & 14,03\% & 2,17\% & 5,43\% & 3,78\% & 33,49\%\\
+40 & 11,03\% & 27,65\% & 3,01\% & 16,47\% & 2,01\% & 2,61\% & 2,56\% & 60,77\%\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Para \(T \leq 8\), o LLC-miss permanece abaixo de 0,3\% em todos os
+modos (Tabela \ref{tab:org04378e1}): a Q-Table inteira cabe no LLC e cada thread
+opera em sua cópia local sem competição inter-socket. A partir de \(T =
+16\) os comportamentos divergem:
+
+\begin{itemize}
+\item \textbf{Hogwild} atinge 35,4\% de LLC-miss com 16 threads e 60,8\% com 40.
+A única Q-Table de 320 KB é escrita continuamente por todos os
+threads, invalidando linhas.
+\item \textbf{Statespace} chega a apenas 2,6\% com 40 threads. O intervalo de
+sincronização é igual ao número de estados (\(10^4\) episódios para o
+grid 100x100), resultando em uma única sincronização durante o
+treino.
+\item \textbf{Every1000} (16,5\% com 40 threads) fica entre sqrt e statespace:
+sincroniza a cada 1000 episódios, menos frequente que o heurístico
+sqrt (27,7\%).
+\end{itemize}
+
+No eixo de L1-miss, every10 (não incluído na tabela) alcança 10--15\%
+em todos os níveis de threads por copiar os 320 KB da Q-Table a cada
+10 episódios, expulsando dados úteis do L1 repetidamente. Os demais
+modos ficam entre 2--13\%, reflexo direto de quão frequentemente o
+merge copia a tabela inteira.
+
+Diferente do grid 10x10 onde o L1-miss é desprezível e o gargalo
+aparece de forma abrupta no LLC a partir de \(T = 16\), no grid
+100x100 o L1-miss já é estrutural e o LLC-miss reflete diretamente a
+frequência de sincronização: intervalos curtos geram mais tráfego de
+coerência, intervalos longos preservam a localidade.
 \subsection{Análise VTune}
-\label{sec:orgbcd2c99}
+\label{sec:orgc9ac33c}
 
 O Intel VTune Profiler foi utilizado no modo \textit{performance-snapshot}
 para coletar IPC (\textit{Instructions Per Cycle}) e percentual de
-\textit{Memory Bound} por configuração (Figura \ref{fig:org84dcddc}).
+\textit{Memory Bound} por configuração (Figura \ref{fig:orgc15a476}).
 
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=.9\linewidth]{vtune.pdf}
-\caption{\label{fig:org84dcddc}IPC (topo) e Memory Bound \% (baixo) por modo de sincronização e tamanho de grid.}
+\caption{\label{fig:orgc15a476}IPC (topo) e Memory Bound \% (baixo) por modo de sincronização e tamanho de grid.}
 \end{figure}
 
 IPC decai com o número de threads em todos os cenários. Isso é
@@ -435,7 +497,7 @@ Memory Bound e baixo IPC, reforçando o que foi visto na análise das
 cache. Esse tamanho faz com que múltiplas threads atualizem um
 conjunto muito restrito de linhas de cache com alta frequência.
 \subsection{Análise de fatores de menor impacto}
-\label{sec:org91f08d6}
+\label{sec:org1c26d1b}
 
 Além do modo de sincronização, o experimento variou o schedule do
 OpenMP (static, dynamic, guided), o tamanho de chunk (auto, 1, 10) e a
@@ -443,7 +505,7 @@ densidade de obstáculos (0\%, 50\%). Os efeitos desses fatores concretos
 no tempo de execução e speedup não foi significativo. Os efeitos são
 analisados abaixo para o grid 100x100 com 10k episódios.
 
-\textbf{Schedule e chunk.} A Figura \ref{fig:orgaad97fd} mostra o speedup médio por
+\textbf{Schedule e chunk.} A Figura \ref{fig:org7f7cda0} mostra o speedup médio por
 schedule, separado por tamanho de chunk e grid. Os três schedules
 produzem speedup praticamente idêntico: as durações de episódio são
 homogêneas e qualquer distribuição de carga é equilibrada. A diferença
@@ -454,10 +516,10 @@ pequeno.
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=.9\linewidth]{sched_impact.pdf}
-\caption{\label{fig:orgaad97fd}Speedup medio por schedule, separado por chunk e grid (10k ep., media sobre obstacles e sync-mode).}
+\caption{\label{fig:org7f7cda0}Speedup medio por schedule, separado por chunk e grid (10k ep., media sobre obstacles e sync-mode).}
 \end{figure}
 
-\textbf{Densidade de obstáculos.} A Figura \ref{fig:org1a463c0} mostra o
+\textbf{Densidade de obstáculos.} A Figura \ref{fig:orgfc1e46e} mostra o
 tempo de treinamento absoluto para 0\% e 50\% de obstáculos. Com 50\%
 de obstáculos, o agente nunca encontra o objetivo e cada episódio
 percorre todos os \texttt{max\_steps} passos, tornando o tempo sequencial
@@ -472,12 +534,12 @@ completamente diferentes.
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=.9\linewidth]{obs_speedup.pdf}
-\caption{\label{fig:org1a463c0}Tempo de treino por densidade de obstáculos (10k ep., media sobre configs e schedules). Barra = sequencial (1 thread), linhas = paralelo.}
+\caption{\label{fig:orgfc1e46e}Tempo de treino por densidade de obstáculos (10k ep., media sobre configs e schedules). Barra = sequencial (1 thread), linhas = paralelo.}
 \end{figure}
 \subsection{Convergência}
-\label{sec:orgfdee45e}
+\label{sec:orgb21221d}
 
-A Figura \ref{fig:orgd215d9c} apresenta a taxa de convergência em função
+A Figura \ref{fig:orga7a727c} apresenta a taxa de convergência em função
 do número de threads, separada por densidade de obstáculos, para o grid
 100x100 com 10k episódios. Com 0\% de obstáculos, todos os modos
 convergem razoavelmente para poucos threads, mas degradam com o aumento
@@ -487,7 +549,7 @@ do paralelismo. Com 50\% de obstáculos, com exceção do pequeno grid
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=.9\linewidth]{conv_obstacles.pdf}
-\caption{\label{fig:orgd215d9c}Taxa de convergência por modo de sincronização e densidade de obstáculos (10k ep.).}
+\caption{\label{fig:orga7a727c}Taxa de convergência por modo de sincronização e densidade de obstáculos (10k ep.).}
 \end{figure}
 
 A causa da degradação nos modos sincronizados é a \textbf\{divisão de
@@ -505,7 +567,7 @@ foi capaz de convergir nesses casos com muitos obstáculos. Isso nos
 diz que apenas uma boa heurística não é o suficiente para o problema
 convergir, também é necessário aumentar o tamanho do problema.
 \subsection{Speedup das Configurações Convergidas}
-\label{sec:org6b1dc5f}
+\label{sec:orgcf56a85}
 
 A tabela a seguir apresenta o speedup médio considerando apenas as
 execuções que convergiram (10k episódios). Células vazias indicam que
@@ -537,7 +599,7 @@ Grid & Config & 2 & 4 & 8 & 16 & 20 & 40\\
 \end{tabular}
 \end{table}
 \section{Conclusão}
-\label{sec:orgd8fa511}
+\label{sec:org32001cc}
 
 Este trabalho paralelizou o Q-Learning por episódios usando OpenMP com
 diferentes estratégias e heurísticas.

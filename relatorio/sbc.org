@@ -451,45 +451,99 @@ e amortizam o custo das barreiras sobre mais trabalho útil.
 Uma coisa que procuramos entender mais a fundo foi a perda do speedup
 no grid 10x10 após 8 threads. Para isso usamos o =perf stat= (eventos
 =L1-dcache-load-misses=, =LLC-loads= e =LLC-load-misses=) para todas as
-combinações de modo de sync-mode e schedule com 10k episódios pois o
-vtune apresentou erros de versão. A Q-Table do grid 10x10 ocupa
-aproximadamente 3,2 KB (100 estados $\times$ 4 ações $\times$ 8 bytes), cabendo
-inteiramente em L1 (32 KB) de qualquer núcleo.
-
-Para $T \leq 8$, a taxa de LLC-miss (misses no último nível da cache,
-normalmente L3) permanece abaixo de 1,2% em todos os modos. No
-intervalo $T \in [8, 16]$, a taxa explode para 23--40% (Tabela
-[[tab:llc]]). Com 16 ou mais threads competindo pelas mesmas poucas linhas
-de cache da Q-Table global, acontecem mais cache misses.
+combinações de sync-mode e schedule com 10k episódios pois o vtune
+apresentou erros de versão. A Q-Table do grid 10x10 ocupa apenas 3,2 KB
+(100 estados $\times$ 4 ações $\times$ 8 bytes), cabendo inteiramente em L1
+(32 KB). O baseline sequencial confirma isso com apenas 0,18% de
+L1-miss.
 
 #+NAME: tab:llc
-#+CAPTION: Taxa de LLC-miss por threads e modo de sync (média dos três schedules, grid 10x10, 10k ep.).
-#+ATTR_LATEX: :booktabs t :align rrrr :center t :font \small
-| Threads | sqrt  | statespace | hogwild |
-|---------+-------+------------+---------|
-|       2 | 0,80% | 1,11%      | 0,44%   |
-|       4 | 0,70% | 0,79%      | 0,18%   |
-|       8 | 0,17% | 0,18%      | 0,11%   |
-|---------+-------+------------+---------|
-|      16 | 30,9% | 23,1%      | 36,7%   |
-|      20 | 29,1% | 22,9%      | 36,4%   |
-|      40 | 40,7% | 28,5%      | 35,9%   |
+#+CAPTION: L1-miss e LLC-miss por threads e modo de sync (media dos tres schedules, grid 10x10, 10k ep.).
+#+ATTR_LATEX: :booktabs t :align rrrrrrr :center t :font \small
+| Threads | sq-L1  | sq-LLC | spc-L1 | spc-LLC | hog-L1  | hog-LLC |
+|---------+--------+--------+--------+---------+---------+---------|
+|       2 | 1,12%  | 0,80%  |  1,10% |   1,11% |   7,42% |   0,44% |
+|       4 | 3,87%  | 0,70%  |  4,10% |   0,79% |   8,53% |   0,18% |
+|       8 | 6,37%  | 0,17%  |  5,15% |   0,18% |  23,20% |   0,11% |
+|---------+--------+--------+--------+---------+---------+---------|
+|      16 | 3,95%  | 30,9%  |  4,64% |   23,1% |   5,99% |   36,7% |
+|      20 | 5,08%  | 29,1%  | 11,09% |   22,9% |   1,38% |   36,4% |
+|      40 | 1,99%  | 40,7%  |  1,98% |   28,5% |   4,17% |   35,9% |
 
-Com poucos threads ($T \leq 8$), o hogwild apresenta LLC-miss
-\emph{menor} que os modos sincronizados: com uma única Q-Table
-compartilhada de 3,2 KB, os dois (ou quatro, ou oito) núcleos tendem a
-manter a tabela nas caches L1/L2 sem competição. Os modos com Q-Tables
-locais (sqrt, statespace) têm cópias separadas por thread, aumentando
-o footprint total e gerando mais tráfego de LLC.  A partir de $T =
-16$, o quadro se inverte: hogwild tende a ter mais LLC-miss (36,7\%)
-porque cada escrita invalida a linha de cache nos demais núcleos,
-enquanto statespace, com intervalo de sincronização mais longo ($=
-100$ episódios para o grid 10x10), mantém as Q-Tables locais isoladas
-por mais tempo, chegando a apenas 23,1\%.
+As máquinas hype tem um dual-socket (2x Intel Xeon E5-2650 v3, 10
+núcleos por socket). Com =OMP_PLACES=cores= e =OMP_PROC_BIND=close=, os
+threads são alocados em núcleos consecutivos: $T \leq 10$ ficam
+inteiramente no socket~0; $T = 16$ já usa 10 núcleos do socket~0 e 6
+do socket~1.
 
-Em todos os modos, o ponto de ruptura de LLC-miss em $T \in [8, 16]$
-confirma que o gargalo do grid 10x10 com muitas threads é tráfego e de
-cache, não escassez de trabalho por thread.
+Para $T \leq 8$, hogwild apresenta L1-miss elevado (7--23%) mas LLC-miss
+abaixo de 0,5% (Tabela [[tab:llc]]): cada escrita na Q-Table compartilhada
+invalida a linha de cache nos demais núcleos, forçando recargas de
+L2/L3, mas os dados são encontrados antes do LLC. Os modos
+sincronizados (sqrt, statespace) mantêm L1-miss baixo ($\leq 6,4\%$) pois
+cada thread opera em cópia local sem invalidações.
+
+A partir de $T = 16$, threads do socket 1 passam a acessar a Q-Table
+alocada na memória do socket 0 para o hogwild. O que aparece como
+LLC-miss no L3 local do socket 1. Para o hogwild esse custo é pago em
+cada acesso, pois não há cópia local: daí os 36,7% de LLC-miss.  Para
+statespace, os threads do socket 1 carregam a cópia local uma vez e a
+reutilizam por 100 episódios antes do próximo merge, amortizando os
+misses e chegando a apenas 23,1%.
+
+Em todos os modos, a fronteira entre socket 0 e socket 1 é o ponto de
+ruptura do LLC-miss, confirmando que o gargalo do grid 10x10 com
+muitas threads é tráfego de cache, não escassez de
+trabalho por thread.
+
+*** Análise de Cache (100x100)
+
+A Q-Table do grid 100x100 ocupa 320 KB ($10^4$ estados $\times$ 4 ações
+$\times$ 8 bytes), excedendo o L1 (32 KB) e o L2 (\approx256 KB) mas
+cabendo no LLC (20 MB). O baseline sequencial já exibe 2,82%
+de L1-miss (vs. 0,18% no grid 10x10), confirmando que a tabela
+transborda o L1 desde o início.
+
+#+NAME: tab:llc100
+#+CAPTION: L1-miss e LLC-miss por threads e modo de sync (media dos tres schedules, grid 100x100, 10k ep.).
+#+ATTR_LATEX: :booktabs t :align rrrrrrrrr :center t :font \scriptsize
+| Threads | sq-L1  | sq-LLC | ev1k-L1 | ev1k-LLC | spc-L1 | spc-LLC | hog-L1 | hog-LLC |
+|---------+--------+--------+---------+----------+--------+---------+--------+---------|
+|       2 |  5,63% |  0,06% |   3,39% |    0,08% |  3,28% |   0,08% |  4,50% |   0,00% |
+|       4 |  6,27% |  0,12% |   2,91% |    0,29% |  2,62% |   0,05% |  4,30% |   0,00% |
+|       8 |  7,80% |  0,01% |   2,64% |    0,04% |  2,09% |   0,05% |  5,41% |   0,20% |
+|---------+--------+--------+---------+----------+--------+---------+--------+---------|
+|      16 | 11,79% |  7,01% |   1,98% |    3,12% |  2,18% |   1,59% |  4,36% |  35,44% |
+|      20 | 12,85% | 22,43% |   2,83% |   14,03% |  2,17% |   5,43% |  3,78% |  33,49% |
+|      40 | 11,03% | 27,65% |   3,01% |   16,47% |  2,01% |   2,61% |  2,56% |  60,77% |
+
+Para $T \leq 8$, o LLC-miss permanece abaixo de 0,3% em todos os
+modos (Tabela [[tab:llc100]]): a Q-Table inteira cabe no LLC e cada thread
+opera em sua cópia local sem competição inter-socket. A partir de $T =
+16$ os comportamentos divergem:
+
+- *Hogwild* atinge 35,4% de LLC-miss com 16 threads e 60,8% com 40.
+  A única Q-Table de 320 KB é escrita continuamente por todos os
+  threads, invalidando linhas.
+- *Statespace* chega a apenas 2,6% com 40 threads. O intervalo de
+  sincronização é igual ao número de estados ($10^4$ episódios para o
+  grid 100x100), resultando em uma única sincronização durante o
+  treino.
+- *Every1000* (16,5% com 40 threads) fica entre sqrt e statespace:
+  sincroniza a cada 1000 episódios, menos frequente que o heurístico
+  sqrt (27,7%).
+
+No eixo de L1-miss, every10 (não incluído na tabela) alcança 10--15%
+em todos os níveis de threads por copiar os 320 KB da Q-Table a cada
+10 episódios, expulsando dados úteis do L1 repetidamente. Os demais
+modos ficam entre 2--13%, reflexo direto de quão frequentemente o
+merge copia a tabela inteira.
+
+Diferente do grid 10x10 onde o L1-miss é desprezível e o gargalo
+aparece de forma abrupta no LLC a partir de $T = 16$, no grid
+100x100 o L1-miss já é estrutural e o LLC-miss reflete diretamente a
+frequência de sincronização: intervalos curtos geram mais tráfego de
+coerência, intervalos longos preservam a localidade.
 
 *** Análise VTune
 

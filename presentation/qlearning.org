@@ -412,7 +412,8 @@ Com 5000 obstáculos, o caminho mínimo tem ~300 passos. Com $gamma = 0.9$:
 #align(center, math.equation($gamma^300 = 0.9^300 approx 0$))
 #+end_export
 
-A recompensa do goal *não chega ao estado inicial*. Mesmo em episódios bem-sucedidos, Q-target em $s_0 approx -10$ (ainda negativo) — aumentar episódios não resolve.
+A recompensa do goal *não chega ao estado inicial*. Mesmo em episódios
+bem-sucedidos, Q-target em $s_0 approx -10$ (ainda negativo), aumentar episódios não resolve.
 
 #+begin_export typst
 #v(0.3em)

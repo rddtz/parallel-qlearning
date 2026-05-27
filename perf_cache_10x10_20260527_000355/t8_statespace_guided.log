@@ -1,0 +1,69 @@
+
+=== POLITICA APRENDIDA ===
+(^ = cima, v = baixo, < = esq, > = dir)
+
++---+---+---+---+---+---+---+---+---+---+
+| v | > | v | v | v | v | v | v | v | v |
++---+---+---+---+---+---+---+---+---+---+
+| v | > | v | v | > | > | v | v | v | ^ |
++---+---+---+---+---+---+---+---+---+---+
+| v | v | > | v | v | > | v | > | v | v |
++---+---+---+---+---+---+---+---+---+---+
+| v | v | v | v | v | > | > | > | v | v |
++---+---+---+---+---+---+---+---+---+---+
+| > | > | > | v | v | > | > | > | v | v |
++---+---+---+---+---+---+---+---+---+---+
+| > | > | > | > | > | > | > | > | v | v |
++---+---+---+---+---+---+---+---+---+---+
+| > | > | > | > | > | v | v | > | v | v |
++---+---+---+---+---+---+---+---+---+---+
+| > | > | > | > | > | v | > | > | v | v |
++---+---+---+---+---+---+---+---+---+---+
+| > | > | > | > | > | > | > | > | v | v |
++---+---+---+---+---+---+---+---+---+---+
+| > | > | > | > | > | > | > | > | > | G |
++---+---+---+---+---+---+---+---+---+---+
+
+=== DEMONSTRACAO DO CAMINHO ===
+Caminho do agente do inicio ao objetivo:
+
+Passo  1: Estado (0,0) -> Acao: BAIXO
+Passo  2: Estado (1,0) -> Acao: BAIXO
+Passo  3: Estado (2,0) -> Acao: BAIXO
+Passo  4: Estado (3,0) -> Acao: BAIXO
+Passo  5: Estado (4,0) -> Acao: DIR
+Passo  6: Estado (4,1) -> Acao: DIR
+Passo  7: Estado (4,2) -> Acao: DIR
+Passo  8: Estado (4,3) -> Acao: BAIXO
+Passo  9: Estado (5,3) -> Acao: DIR
+Passo 10: Estado (5,4) -> Acao: DIR
+Passo 11: Estado (5,5) -> Acao: DIR
+Passo 12: Estado (5,6) -> Acao: DIR
+Passo 13: Estado (5,7) -> Acao: DIR
+Passo 14: Estado (5,8) -> Acao: BAIXO
+Passo 15: Estado (6,8) -> Acao: BAIXO
+Passo 16: Estado (7,8) -> Acao: BAIXO
+Passo 17: Estado (8,8) -> Acao: BAIXO
+Passo 18: Estado (9,8) -> Acao: DIR
+Passo 19: Estado (9,9) -> OBJETIVO ALCANCADO!
+
+Agente encontrou o caminho em 18 passos.
+
+TRAINING_TIME_S: 0.002956
+CONVERGED: yes
+
+ Performance counter stats for '/scratch/rrdmatos/perf_cache_788683_20260527_000354/bin/qlearning_parallel --gridx 10 --gridy 10 --obstacles 0 --episodes 10000 --maxsteps 1000 --epsilon 0.3 --seed 54 --sync-mode statespace --quiet':
+
+         6,390,591      L1-dcache-loads                                                      (85.73%)
+           372,471      L1-dcache-load-misses            #    5.83% of all L1-dcache accesses
+           214,625      LLC-loads                                                            (57.12%)
+               341      LLC-load-misses                  #    0.16% of all LL-cache accesses  (57.12%)
+           296,923      cache-references                                                     (57.12%)
+     <not counted>      cache-misses                                                  (0.00%)
+
+       0.004363972 seconds time elapsed
+
+       0.023448000 seconds user
+       0.000000000 seconds sys
+
+

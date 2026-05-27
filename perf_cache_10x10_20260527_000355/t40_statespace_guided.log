@@ -1,0 +1,71 @@
+
+=== POLITICA APRENDIDA ===
+(^ = cima, v = baixo, < = esq, > = dir)
+
++---+---+---+---+---+---+---+---+---+---+
+| v | > | > | > | > | > | v | > | > | v |
++---+---+---+---+---+---+---+---+---+---+
+| v | v | v | v | > | > | v | v | v | v |
++---+---+---+---+---+---+---+---+---+---+
+| v | > | v | v | > | v | v | v | v | v |
++---+---+---+---+---+---+---+---+---+---+
+| > | v | > | > | v | v | v | v | v | v |
++---+---+---+---+---+---+---+---+---+---+
+| v | < | > | > | > | v | v | > | v | v |
++---+---+---+---+---+---+---+---+---+---+
+| > | v | > | > | > | v | v | v | v | v |
++---+---+---+---+---+---+---+---+---+---+
+| v | > | > | v | v | > | v | v | v | v |
++---+---+---+---+---+---+---+---+---+---+
+| > | > | > | > | v | > | v | > | v | v |
++---+---+---+---+---+---+---+---+---+---+
+| > | > | > | > | > | > | > | v | > | v |
++---+---+---+---+---+---+---+---+---+---+
+| > | > | > | > | > | > | > | > | > | G |
++---+---+---+---+---+---+---+---+---+---+
+
+=== DEMONSTRACAO DO CAMINHO ===
+Caminho do agente do inicio ao objetivo:
+
+Passo  1: Estado (0,0) -> Acao: BAIXO
+Passo  2: Estado (1,0) -> Acao: BAIXO
+Passo  3: Estado (2,0) -> Acao: BAIXO
+Passo  4: Estado (3,0) -> Acao: DIR
+Passo  5: Estado (3,1) -> Acao: BAIXO
+Passo  6: Estado (4,1) -> Acao: ESQ
+Passo  7: Estado (4,0) -> Acao: BAIXO
+Passo  8: Estado (5,0) -> Acao: DIR
+Passo  9: Estado (5,1) -> Acao: BAIXO
+Passo 10: Estado (6,1) -> Acao: DIR
+Passo 11: Estado (6,2) -> Acao: DIR
+Passo 12: Estado (6,3) -> Acao: BAIXO
+Passo 13: Estado (7,3) -> Acao: DIR
+Passo 14: Estado (7,4) -> Acao: BAIXO
+Passo 15: Estado (8,4) -> Acao: DIR
+Passo 16: Estado (8,5) -> Acao: DIR
+Passo 17: Estado (8,6) -> Acao: DIR
+Passo 18: Estado (8,7) -> Acao: BAIXO
+Passo 19: Estado (9,7) -> Acao: DIR
+Passo 20: Estado (9,8) -> Acao: DIR
+Passo 21: Estado (9,9) -> OBJETIVO ALCANCADO!
+
+Agente encontrou o caminho em 20 passos.
+
+TRAINING_TIME_S: 0.008390
+CONVERGED: yes
+
+ Performance counter stats for '/scratch/rrdmatos/perf_cache_788683_20260527_000354/bin/qlearning_parallel --gridx 10 --gridy 10 --obstacles 0 --episodes 10000 --maxsteps 1000 --epsilon 0.3 --seed 54 --sync-mode statespace --quiet':
+
+        34,414,044      L1-dcache-loads                                                      (25.30%)
+         1,074,388      L1-dcache-load-misses            #    3.12% of all L1-dcache accesses  (99.10%)
+           989,339      LLC-loads                                                            (81.28%)
+           285,603      LLC-load-misses                  #   28.87% of all LL-cache accesses  (81.28%)
+         1,304,125      cache-references                                                     (81.28%)
+           365,470      cache-misses                     #   28.024 % of all cache refs      (26.67%)
+
+       0.010093518 seconds time elapsed
+
+       0.295343000 seconds user
+       0.000000000 seconds sys
+
+
