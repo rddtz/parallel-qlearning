@@ -170,6 +170,65 @@ episódios:
 
 *** Com Sincronização
 
+Na abordagem com sincronização, cada thread mantém uma cópia local da
+Q-Table e treina de forma independente por um intervalo fixo de
+episódios. Ao final de cada intervalo, as tabelas locais são
+combinadas em uma média ponderada que é transmitida de volta a todas
+as threads --- um ciclo denominado /federated averaging/.
+
+O intervalo de sincronização é calculado automaticamente por duas
+heurísticas, selecionáveis via =--sync-mode=:
+
+- *sqrt* --- O intervalo é $\lfloor\sqrt{N/T}\rfloor$, onde $N$ é o
+  total de episódios e $T$ o número de threads. Essa heurística
+  minimiza o regret bound em algoritmos paralelos de gradiente
+  estocástico: sincronizações muito frequentes desperdiçam tempo em
+  barreiras; sincronizações muito raras permitem que as tabelas
+  locais divirjam demais antes da fusão \cite{niu2011hogwild}.
+- *statespace* --- O intervalo equivale ao número de estados do grid
+  ($L \times C$). A ideia é que cada thread percorra ao menos uma vez
+  todos os estados antes de sincronizar, garantindo que a média
+  resultante reflita experiências cobrindo o espaço de estados
+  inteiro.
+
+A fusão das tabelas usa um merge baseado em \textit{delta} para
+corrigir a diluição que ocorre quando o tamanho do chunk é menor do
+que o número de threads. No merge absoluto, threads que não recebem
+episódios em um chunk ficam com a tabela do broadcast anterior (igual
+ao snapshot), mas ainda contribuem para a média, diluindo os updates
+reais pelo fator $1/T$. A correção calcula apenas os deltas das
+threads ativas:
+
+$$Q_{\text{novo}}[s][a] = Q_{\text{snap}}[s][a] +
+\frac{\displaystyle\sum_{t} \bigl(Q_t[s][a] - Q_{\text{snap}}[s][a]\bigr)}{T_{\text{ativas}}}$$
+
+onde $T_{\text{ativas}} = \min(\text{chunk}, T)$. Threads ociosas
+contribuem delta zero e não afetam a divisão, preservando o
+alpha efetivo de cada update.
+
+#+CAPTION: Merge delta no federated averaging (train_federated)
+#+begin_export latex
+\begin{lstlisting}[float=h]
+int chunk_size = episode_end - episode_start;
+int active     = (chunk_size < num_threads) ? chunk_size : num_threads;
+
+#pragma omp for collapse(2)
+for (state = 0; state < ql->num_states; state++) {
+    for (action = 0; action < NUM_ACTIONS; action++) {
+        double snapshot  = ql->q_table[state][action];
+        double delta_sum = 0.0;
+        for (tt = 0; tt < num_threads; tt++)
+            delta_sum += local_q_tables[tt][state][action] - snapshot;
+        ql->q_table[state][action] = snapshot + delta_sum / active;
+    }
+}
+\end{lstlisting}
+#+end_export
+
+Apos o merge, a tabela global e transmitida a todas as threads
+(broadcast) antes do proximo chunk, de modo que cada thread comeca
+o intervalo seguinte a partir de um estado de conhecimento compartilhado.
+
 *** HOGWILD!
 
 HOGWILD! \cite{niu2011hogwild} é um método de paralelização lock-free para
@@ -221,6 +280,56 @@ threads atualizam a mesma Q-table sem nenhuma coordenação explícita. O
 de execução; com =dynamic=, episódios são atribuídos sob demanda, reduzindo
 a probabilidade de threads vizinhas concentrarem atualizações na mesma região
 do grid ao mesmo tempo --- alinhado com a hipótese de esparsidade do método.
+
+** Metodologia Experimental
+
+O experimento adota um design fatorial completo sobre os fatores
+listados na Tabela \ref{tab:fatores}. Para cada combinação de
+parâmetros, o tempo de treinamento (medido dentro de =train()=) é
+registrado em múltiplos blocos de replicação, permitindo estimar a
+variância de tempo devida ao escalonador do sistema operacional.
+
+#+NAME: tab:fatores
+#+CAPTION: Fatores e níveis do experimento.
+#+ATTR_LATEX: :booktabs t :align lll
+| Fator             | Níveis                        | Motivação                                         |
+|-------------------+-------------------------------+---------------------------------------------------|
+| Threads           | 1, 2, 4, 8, 16, 20, 40       | Cobre desde serial até hyperthreading completo    |
+| Tamanho do grid   | 10, 50, 100                   | Espaço de estados pequeno, médio e grande         |
+| Modo de sync      | =sqrt=, =statespace=, =hogwild= | Três estratégias de paralelização                 |
+| Episódios         | 5000, 10000                   | Limiar de convergência: 5k instável, 10k estável  |
+| Densidade obst.   | 0%, 50%                       | Grid livre vs. grade com alta densidade           |
+| Schedule OpenMP   | =static=, =guided=, =dynamic=  | Políticas de distribuição de trabalho             |
+| Chunk             | 0, 1, 10                      | Granularidade do chunking para =guided=/=dynamic=  |
+| Blocos (replics.) | 1--6                          | Jitter de tempo do SO (algoritmo é determinístico)|
+
+*** Baseline Sequencial
+
+Linhas com =threads=1= invocam o binário sequencial puro, sem runtime
+OpenMP. Isso garante que o speedup seja calculado contra o tempo real
+do algoritmo, sem incluir o overhead de criação do pool de threads do
+OpenMP no denominador.
+
+*** Afinidade de Threads
+
+A política de afinidade é definida de acordo com o número de threads:
+
+- $T \leq 20$: =OMP_PLACES=cores=, =OMP_PROC_BIND=close= --- uma thread
+  por núcleo físico, sem hyperthreading, minimizando contenção de cache.
+- $T = 40$: =OMP_PLACES=threads=, =OMP_PROC_BIND=close= --- uma thread
+  por CPU lógica, utilizando hyperthreading completo.
+
+O cluster utilizado possui nós Intel Xeon Haswell com 20 núcleos
+físicos e 40 CPUs lógicas a 2,295 GHz, alocados exclusivamente via
+SLURM.
+
+*** Medição de Tempo
+
+O tempo registrado em =training_time_s= corresponde exclusivamente à
+execução de =train()=, excluindo inicialização do ambiente, alocação de
+memória e impressão de resultados. O binário paralelo usa
+=omp_get_wtime()= e o sequencial usa =clock_gettime(CLOCK_MONOTONIC)=,
+ambos medindo tempo de parede (/wall-clock/).
 
 ** Resultados
 *** Dados                                                           :noexport:
