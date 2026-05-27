@@ -161,6 +161,13 @@ Como dito anteriormente, a paralelização dos episódios foi escolhida como a m
 
 *** HOGWILD!
 HOGWILD! é um 'update scheme' alternativo que pode ser utilizado ao paralelizar Stochastic Gradient Descent (SGDs) sem utilizar locks. Esse update scheme permite que processadores acessem uma memória compartilhada, introduzindo a possibilidade de sobrescrever o trabalho de outro processador. O artigo a seguir \href{https://arxiv.org/pdf/1106.5730}{Hogwild!: A Lock-Free Approach to Parallelizing Stochastic Gradient Descent} demonstra experimentalmente que HOGWILD! supera outros 'schemes' que usam locking em ordens de magnitude. 
+Decidimos utilizar abordagem para diversificar os resultados e proporcionar uma base de dados mais rica para a análise.
+A função train_hogwild faz com que cada thread amostre uniformemente
+os episódios do espaço de treinamento, calcula o gradiente (via
+equação de Bellman), e escreve na q_table compartilhada sem nenhum
+lock. O schedule(dynamic) mapeia para a ideia do artigo de que os
+processadores devem pegar trabalho sob demanda para evitar que
+concentrem atualizações na mesma região do espaço de estados.
 
 ** Background and Experimental Context
 <<sec.context>>
