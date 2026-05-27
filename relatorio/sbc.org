@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # -*- mode: org -*-
 
-#+TITLE: Article Title
+#+TITLE: Paralelização do Algoritmo Q-Learning com OpenMP
 #+AUTHOR: Lucas Mello Schnorr
 
 #+STARTUP: overview indent
@@ -33,16 +33,14 @@
 \title{\orgtitle}
 
 \author{
-   Lucas Mello Schnorr\inst{1},
-   Somebody Else\inst{2}}
+   Rayan Raddatz de Matos (00584919) \inst{1},
+   Eduardo Magnus Lazuta ()\inst{1}, \\
+   Enzo Lisboa Peixoto ()\inst{1}}
 
 \address{
-   Institute of Informatics, Federal University of Rio Grande do Sul (UFRGS)\\
+   Instituto de Informática, Universidade Federal do Rio Grande do Sul (UFRGS)\\
    Caixa Postal 15.064 -- 91.501-970 -- Porto Alegre -- RS -- Brazil
-   \nextinstitute
-   Somebody else's Institution,
-   Adress --  Brazil
-   \email{schnorr@inf.ufrgs.br}}
+}
 #+END_EXPORT
 
 #+LaTeX: \maketitle
@@ -57,27 +55,29 @@ Put the abstract here.
 Coloque o resumo aqui.
 #+end_resumo
 
-** Introduction
-
-This is just an example to show how Orgmode cite:orgmode can be
-neatly used to write papers following the SBC Article latex style. Feel
-free to modify and distributed this as you wish.
-
-Be aware that this example is compatible with OrgMode 9.*. Earlier or
-later OrgMode versions require minor modifications to the Makefile
-and/or ieee.org files.
-
-For a detailed explanation on why and how to write reproducible
-articles using OrgMode, please visit the following [[https://github.com/alegrand/RR_webinars/blob/master/1_replicable_article_laboratory_notebook/index.org][page]].
-
 ** Apresentação do Algoritmo
 *** Explicação do Algoritmo
-O algoritmo Q-Learning é um método de aprendizado por reforço no qual um agente aprende a alcançar um objetivo final utilizando uma tabela chamada Q-Table. Essa tabela armazena valores para cada par de estado e ação, indicando o quão boa é determinada ação em um estado específico. Com base nesses valores, o agente tende a escolher as ações que possuem as maiores recompensas esperadas.
+O algoritmo Q-Learning é um método de aprendizado por reforço no qual
+um agente aprende a alcançar um objetivo final utilizando uma tabela
+chamada Q-Table. Essa tabela armazena valores para cada par de estado
+e ação, indicando o quão boa é determinada ação em um estado
+específico. Com base nesses valores, o agente tende a escolher as
+ações que possuem as maiores recompensas esperadas.
 
-Para construir essa tabela, o agente precisa passar por um processo de treinamento composto por vários episódios. Em cada episódio, o agente executa uma sequência de passos (steps). A cada passo, uma ação é escolhida, o ambiente retorna uma recompensa, e o valor correspondente na Q-Table é atualizado. Ao longo do treinamento, o agente aprende quais ações produzem os melhores resultados para alcançar o objetivo desejado.
+Para construir essa tabela, o agente precisa passar por um processo de
+treinamento composto por vários episódios. Em cada episódio, o agente
+executa uma sequência de passos (steps). A cada passo, uma ação é
+escolhida, o ambiente retorna uma recompensa, e o valor correspondente
+na Q-Table é atualizado. Ao longo do treinamento, o agente aprende
+quais ações produzem os melhores resultados para alcançar o objetivo
+desejado.
 
 *** Problema Escolhido
-O algoritmo Q-Learning foi escolhido para resolver um problema de pathfinding em um mundo em formato de grade. O desafio consiste em fazer um agente chegar ao ponto final utilizando apenas quatro ações de movimento: mover-se para cima, para baixo, para a esquerda e para a direita.
+O algoritmo Q-Learning foi escolhido para resolver um problema de
+pathfinding em um mundo em formato de grade. O desafio consiste em
+fazer um agente chegar ao ponto final utilizando apenas quatro ações
+de movimento: mover-se para cima, para baixo, para a esquerda e para a
+direita.
 
 *** Pseudocódigo
 
@@ -129,43 +129,45 @@ O algoritmo Q-Learning foi escolhido para resolver um problema de pathfinding em
 #+end_export
 
 ** Possibilidade de Paralelização
-Com base no código do Q-Learning sequencial, foram identificadas três possíveis abordagens de paralelização:
+Com base no código do Q-Learning sequencial, foram identificadas três
+possíveis abordagens de paralelização:
 
 - Paralelização da obtenção da melhor ação;
 - Paralelização dos steps;
 - Paralelização dos episódios.
 
-A paralelização da obtenção da melhor ação foi descartada, pois o número de ações disponíveis para o agente é relativamente pequeno, não proporcionando ganho de desempenho significativo que justificasse o custo da paralelização.
+A paralelização da obtenção da melhor ação foi descartada, pois o
+número de ações disponíveis para o agente é relativamente pequeno, não
+proporcionando ganho de desempenho significativo que justificasse o
+custo da paralelização.
 
-A paralelização dos steps também foi descartada, uma vez que cada step depende diretamente do estado atual, e o estado atual é resultado da ação executada no step anterior. Dessa forma, existe uma dependência verdadeira entre as execuções, tornando necessária a sincronização entre as threads e reduzindo os benefícios da paralelização.
+A paralelização dos steps também foi descartada, uma vez que cada step
+depende diretamente do estado atual, e o estado atual é resultado da
+ação executada no step anterior. Dessa forma, existe uma dependência
+verdadeira entre as execuções, tornando necessária a sincronização
+entre as threads e reduzindo os benefícios da paralelização.
 
-Por fim, a paralelização dos episódios foi escolhida como a abordagem mais adequada, pois cada episódio pode ser executado de forma independente. Isso reduz problemas de dependência entre threads e permite melhor aproveitamento do paralelismo durante o treinamento do agente.
+Por fim, a paralelização dos episódios foi escolhida como a abordagem
+mais adequada, pois cada episódio pode ser executado de forma
+independente. Isso reduz problemas de dependência entre threads e
+permite melhor aproveitamento do paralelismo durante o treinamento do
+agente.
 
 ** Maneiras de Paralelizar os Episódios
-Como dito anteriormente, a paralelização dos episódios foi escolhida como a mais adequada, porém existe duas possíveis de parelizar os episódios:
-- A primeira maneira é que cada thread vai ter sua Q-Table Local e dado tantos episódios, vai sincronizar com a Q-Table Global (a que será aprendida no final);
-- A segunda maneira é que cada thread vai acessar e atualizar diretamente na Q-Table Global. Esse método é chamado de HogWild;
+Como dito anteriormente, a paralelização dos episódios foi escolhida
+como a mais adequada, porém existe duas possíveis de parelizar os
+episódios:
+
+- A primeira maneira é que cada thread vai ter sua Q-Table Local e
+  dado tantos episódios, vai sincronizar com a Q-Table Global (a que
+  será aprendida no final);
+- A segunda maneira é que cada thread vai acessar e atualizar
+  diretamente na Q-Table Global. Esse método é chamado de HogWild;
 
 *** Com Sincronização
 
 *** Hogwild
 
-** Background and Experimental Context
-<<sec.context>>
-*** Background
-<<sec.background>>
-*** Experimental Context and Workload Details
-<<sec.setup>>
-** Related Work and Motivation
-<<sec.relatedwork>>
-
-Check this paper cite:schnorr2013visualizing about how you need to
-semantically aggregate data.
-
-** Your Great Contribution to Computer Science
-<<sec.proposal>>
-** Your Super Results
-** Conclusion
 ** Acknowledgments
 :PROPERTIES:
 :UNNUMBERED: t
