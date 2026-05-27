@@ -176,6 +176,42 @@ lock. O schedule(dynamic) mapeia para a ideia do artigo de que os
 processadores devem pegar trabalho sob demanda para evitar que
 concentrem atualizações na mesma região do espaço de estados.
 
+** Resultados
+*** Dados                                                           :noexport:
+
+#+begin_src R :session r :exports none :results silent
+df <- read.csv("../results/experiment-788598_20260526_171020/project_results.csv")
+
+base <- aggregate(training_time_s ~ block, data=df[df$threads == 1, ], FUN=median)
+names(base)[2] <- "base_time"
+
+agg <- aggregate(training_time_s ~ threads + block + sync_mode,
+                 data=df[df$threads > 1, ], FUN=median)
+agg <- merge(agg, base, by="block")
+agg$speedup <- agg$base_time / agg$training_time_s
+agg$block   <- factor(paste("Bloco", agg$block))
+
+ideal <- expand.grid(threads=c(2,4,8,16,20,40), block=unique(agg$block))
+ideal$speedup <- ideal$threads
+#+end_src
+
+*** Speedup por Tamanho de Bloco
+
+#+begin_src R :session r :exports results :results graphics file :file speedup_blocks.pdf :width 6 :height 7
+library(ggplot2)
+
+ggplot(agg, aes(x=threads, y=speedup, color=sync_mode, shape=sync_mode)) +
+  geom_line() +
+  geom_point(size=1.5) +
+  geom_line(data=ideal, aes(x=threads, y=speedup),
+            color="gray70", linetype="dashed", inherit.aes=FALSE) +
+  facet_wrap(~block, ncol=3) +
+  scale_x_continuous(breaks=c(2,4,8,16,20,40)) +
+  labs(x="Threads", y="Speedup", color=NULL, shape=NULL) +
+  theme_classic(base_size=8) +
+  theme(legend.position="bottom", strip.background=element_blank())
+#+end_src
+
 ** Conclusion
 
 ** Acknowledgments
