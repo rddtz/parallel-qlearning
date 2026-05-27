@@ -18,6 +18,9 @@
 #+LATEX_HEADER: \sloppy
 #+LATEX_HEADER: \usepackage{algorithm}
 #+LATEX_HEADER: \usepackage{algpseudocode}
+#+LATEX_HEADER: \usepackage{xcolor}
+#+LATEX_HEADER: \usepackage{listings}
+#+LATEX_HEADER: \lstset{basicstyle=\footnotesize\ttfamily, frame=single, breaklines=true, numbers=left, numberstyle=\tiny\color{gray}, language=C}
 
 # PDF generation can be done by make (thanks Luka Stanisic)
 #   or C-c C-e l p (thanks Vinicius Garcia)
@@ -167,33 +170,93 @@ episódios:
 *** Com Sincronização
 
 *** HOGWILD!
-HOGWILD! é um 'update scheme' alternativo que pode ser utilizado ao paralelizar Stochastic Gradient Descent (SGDs) sem utilizar locks. Esse update scheme permite que processadores acessem uma memória compartilhada, introduzindo a possibilidade de sobrescrever o trabalho de outro processador. O artigo a seguir \href{https://arxiv.org/pdf/1106.5730}{Hogwild!: A Lock-Free Approach to Parallelizing Stochastic Gradient Descent} demonstra experimentalmente que HOGWILD! supera outros 'schemes' que usam locking em ordens de magnitude. 
-Decidimos utilizar abordagem para diversificar os resultados e proporcionar uma base de dados mais rica para a análise.
-A função train_hogwild faz com que cada thread amostre uniformemente
-os episódios do espaço de treinamento, calcula o gradiente (via
-equação de Bellman), e escreve na q_table compartilhada sem nenhum
-lock. O schedule(dynamic) mapeia para a ideia do artigo de que os
-processadores devem pegar trabalho sob demanda para evitar que
-concentrem atualizações na mesma região do espaço de estados.
+
+HOGWILD! \cite{niu2011hogwild} é um método de paralelização lock-free para
+algoritmos de gradiente estocástico (SGD): cada processador lê e escreve
+diretamente na estrutura de parâmetros compartilhada, sem locks, aceitando
+\textit{race conditions} em troca de menor overhead de sincronização.
+
+No contexto do Q-Learning, três propriedades tornam essa abordagem adequada:
+
+- *Esparsidade* --- cada episódio visita apenas uma fração dos estados do
+  grid, reduzindo a chance de duas threads atualizarem o mesmo $Q(s, a)$
+  simultaneamente;
+- *Escala dos updates* --- cada atualização é ponderada por $\alpha \leq
+  0{,}1$, de modo que sobrescrever um update ocasional equivale a um ruído de
+  magnitude $O(\alpha)$, negligenciável para a convergência;
+- *Simetria direcional* --- ambos os valores concorrentes são gradientes
+  válidos calculados a partir de trajetórias distintas; nenhum é
+  incorreto.
+
+A implementação em OpenMP é minimal: cada thread recebe uma cópia local da
+estrutura =QLearning= apenas para isolar o gerador de números aleatórios
+(=rand_seed=), enquanto o ponteiro =q_table= permanece apontando para a
+Q-table compartilhada. Não há barreiras, não há locks, não há seções
+críticas sobre os valores de $Q$.
+
+#+CAPTION: Implementação HOGWILD! em OpenMP (train_hogwild)
+#+begin_export latex
+\begin{lstlisting}
+#pragma omp parallel private(episode)
+{
+    int tid = omp_get_thread_num();
+
+    /* Copia local apenas para rand_seed independente por thread.
+     * q_table ainda aponta para a Q-table COMPARTILHADA. */
+    QLearning local_ql = *ql;
+    local_ql.rand_seed = cfg->seed + (unsigned int)tid * 1000003U;
+
+    #pragma omp for schedule(runtime)
+    for (episode = 0; episode < cfg->num_episodes; episode++)
+        run_episode(&local_ql, episode); /* lê/escreve shared sem lock */
+}
+\end{lstlisting}
+#+end_export
+
+O ponto central da implementação está na linha 6: =local_ql.q_table= não é
+copiada --- herda o ponteiro original. Assim, todos os episódios de todas as
+threads atualizam a mesma Q-table sem nenhuma coordenação explícita. O
+=schedule(runtime)= permite configurar a distribuição dos episódios em tempo
+de execução; com =dynamic=, episódios são atribuídos sob demanda, reduzindo
+a probabilidade de threads vizinhas concentrarem atualizações na mesma região
+do grid ao mesmo tempo --- alinhado com a hipótese de esparsidade do método.
 
 ** Resultados
 *** Dados                                                           :noexport:
 
-#+begin_src R :session r :exports none :results silent
-df <- read.csv("../results/experiment-788598_20260526_171020/project_results.csv")
+#+begin_src R :session r :exports none :results output
+  options(crayon.enabled=FALSE)
+  suppressMessages(library(tidyverse))
 
-base <- aggregate(training_time_s ~ block, data=df[df$threads == 1, ], FUN=median)
-names(base)[2] <- "base_time"
 
-agg <- aggregate(training_time_s ~ threads + block + sync_mode,
-                 data=df[df$threads > 1, ], FUN=median)
-agg <- merge(agg, base, by="block")
-agg$speedup <- agg$base_time / agg$training_time_s
-agg$block   <- factor(paste("Bloco", agg$block))
-
-ideal <- expand.grid(threads=c(2,4,8,16,20,40), block=unique(agg$block))
-ideal$speedup <- ideal$threads
+  df <- read.csv("../results/experiment-788598_20260526_171020/project_results.csv")
+  df |> glimpse()
 #+end_src
+
+#+RESULTS:
+#+begin_example
+Rows: 19,512
+Columns: 19
+$ threads                 <int> 20, 4, 40, 2, 4, 4, 8, 16, 4, 2, 8, 2, 2, 20, 2, 40, 40, 40, 8, 8, 2, …
+$ grid_size               <int> 50, 10, 50, 10, 50, 10, 50, 100, 10, 50, 10, 10, 100, 10, 50, 50, 10, …
+$ sync_mode               <chr> "sqrt", "sqrt", "statespace", "hogwild", "hogwild", "sqrt", "sqrt", "s…
+$ sync_interval           <int> 10, 1000, 0, 0, 0, 0, 0, 0, 0, 10, 1000, 1000, 1000, 10, 0, 10, 0, 0, …
+$ episodes                <int> 10000, 10000, 5000, 10000, 10000, 5000, 5000, 5000, 5000, 10000, 10000…
+$ schedule                <chr> "static", "guided", "guided", "dynamic", "dynamic", "static", "dynamic…
+$ chunk                   <int> 1, 0, 0, 1, 1, 0, 10, 0, 1, 0, 10, 0, 1, 1, 1, 0, 0, 1, 10, 10, 0, 10,…
+$ obstacles_pct           <int> 50, 0, 0, 0, 0, 50, 0, 0, 0, 50, 0, 0, 0, 50, 0, 0, 50, 50, 0, 50, 50,…
+$ block                   <int> 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1…
+$ training_time_s         <dbl> 0.564461, 0.002911, 0.018789, 0.006129, 0.022150, 0.003878, 0.059202, …
+$ converged               <chr> "no", "yes", "no", "yes", "yes", "yes", "no", "no", "yes", "no", "yes"…
+$ vtune_elapsed_s         <lgl> NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA…
+$ vtune_ipc               <lgl> NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA…
+$ vtune_mem_bound_pct     <lgl> NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA…
+$ thread_cpu_time_s       <lgl> NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA…
+$ thread_wait_time_s      <lgl> NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA…
+$ thread_spin_time_s      <lgl> NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA…
+$ thread_overhead_time_s  <lgl> NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA…
+$ thread_eff_cpu_util_pct <lgl> NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA…
+#+end_example
 
 *** Speedup por Tamanho de Bloco
 
@@ -211,6 +274,9 @@ ggplot(agg, aes(x=threads, y=speedup, color=sync_mode, shape=sync_mode)) +
   theme_classic(base_size=8) +
   theme(legend.position="bottom", strip.background=element_blank())
 #+end_src
+
+#+RESULTS:
+[[file:speedup_blocks.pdf]]
 
 ** Conclusion
 
@@ -254,6 +320,14 @@ Tangle this file with C-c C-v t
   pages={149--162},
   year={2013},
   publisher={Springer}
+}
+
+@inproceedings{niu2011hogwild,
+  title={Hogwild!: A lock-free approach to parallelizing stochastic gradient descent},
+  author={Niu, Feng and Recht, Benjamin and Re, Christopher and Wright, Stephen},
+  booktitle={Advances in Neural Information Processing Systems},
+  volume={24},
+  year={2011}
 }
 #+end_src
 * Emacs setup                                                      :noexport:
