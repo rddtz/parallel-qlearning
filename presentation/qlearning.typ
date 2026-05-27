@@ -61,10 +61,10 @@ image("logos/INF.png", height: 1.9cm),
 ]
 ]
 #set text(size: 22pt)
-#heading(level: 2, outlined: false, numbering: none)[Agenda] #label("org8132edc")
+#heading(level: 2, outlined: false, numbering: none)[Agenda] #label("org998cd1f")
 #list(list.item[Problema e Algoritmo])#list(list.item[Paralelização])#list(list.item[Metodologia Experimental])#list(list.item[Resultados])#list(list.item[Conclusão])
-#heading(level: 1, outlined: false, numbering: none)[Problema e Algoritmo] #label("org95febab")
-#heading(level: 2, outlined: false, numbering: none)[Q\u{2d}Learning: pathfinding em grid] #label("orgddaa8fd")
+#heading(level: 1, outlined: false, numbering: none)[Problema e Algoritmo] #label("org873f564")
+#heading(level: 2, outlined: false, numbering: none)[Q\u{2d}Learning: pathfinding em grid] #label("orgd37eac5")
 Agente aprende a navegar de $(0,0)$ até $(L-1, C-1)$ em um grid $L times C$
 com obstáculos. Ações: cima, baixo, esquerda, direita.
 
@@ -83,7 +83,7 @@ A cada passo, a Q\u{2d}Table é atualizada pela equação de Bellman:
 
 Após o treinamento, a política ótima é extraída como
 $pi(s) = arg max_a Q(s,a)$.
-#heading(level: 2, outlined: false, numbering: none)[Estrutura de um episódio] #label("orge937431")
+#heading(level: 2, outlined: false, numbering: none)[Estrutura de um episódio] #label("orgcdbe9b0")
 #grid(
   columns: (1fr, 1fr),
   gutter: 1.5em,
@@ -109,8 +109,8 @@ Recompensas configuradas:
 Grids testados: *10x10, 50x50, 100x100*
 ]
 )
-#heading(level: 1, outlined: false, numbering: none)[Paralelização] #label("org49e9f8c")
-#heading(level: 2, outlined: false, numbering: none)[Qual nível de paralelismo?] #label("org49e721c")
+#heading(level: 1, outlined: false, numbering: none)[Paralelização] #label("orga50fff6")
+#heading(level: 2, outlined: false, numbering: none)[Qual nível de paralelismo?] #label("org43eae18")
 Três opções foram consideradas:
 
 #v(0.6em)
@@ -132,7 +132,7 @@ Três opções foram consideradas:
 
 Mas paralelizar sem sincronização não basta: com $T$ threads e $E$ episódios,
 cada thread aprende como se tivesse apenas $E slash T$ episódios.
-#heading(level: 2, outlined: false, numbering: none)[Sincronização Periódica] #label("org55cc5a1")
+#heading(level: 2, outlined: false, numbering: none)[Sincronização Periódica] #label("org29f6539")
 Cada thread mantém uma #text(weight: "bold", [Q\u{2d}Table local]), treina um lote de #raw("sync_interval") episódios
 e funde os deltas na Q\u{2d}Table global:
 
@@ -156,7 +156,7 @@ for (state ...) for (action ...) {
 
 #text(weight: "bold", [Merge por delta]): divide pelas threads #text(weight: "bold", [ativas]) (#raw("active = min(chunk, T)")),
 preservando o $alpha$ efetivo quando #raw("chunk_size < T").
-#heading(level: 2, outlined: false, numbering: none)[Heurísticas de sync\u{5f}interval] #label("org287bd3e")
+#heading(level: 2, outlined: false, numbering: none)[Heurísticas de sync\u{5f}interval] #label("orgda020dc")
 Duas estratégias automáticas implementadas em #raw("train()"):
 
 #v(0.8em)
@@ -172,7 +172,7 @@ Duas estratégias automáticas implementadas em #raw("train()"):
 #pause
 
 Além disso, testamos valores fixos: #text(weight: "bold", [every10]) (#raw("i=10")) e #text(weight: "bold", [every1000]) (#raw("i=1000")).
-#heading(level: 2, outlined: false, numbering: none)[HOGWILD!] #label("org8a9286b")
+#heading(level: 2, outlined: false, numbering: none)[HOGWILD!] #label("org1a3f3b3")
 Todas as threads leem e escrevem na #text(weight: "bold", [mesma Q\u{2d}Table sem nenhuma sincronização]):
 
 #v(0.5em)
@@ -193,8 +193,8 @@ for (episode = 0; episode < N; episode++)
 #pause
 
 Race conditions são \u{22}intencionais\u{22} e \u{22}inofensivas\u{22} para casos esparsos.
-#heading(level: 1, outlined: false, numbering: none)[Metodologia Experimental] #label("org5c1c48f")
-#heading(level: 2, outlined: false, numbering: none)[Fatores do experimento] #label("orga546d20")
+#heading(level: 1, outlined: false, numbering: none)[Metodologia Experimental] #label("orgcdd4f6c")
+#heading(level: 2, outlined: false, numbering: none)[Fatores do experimento] #label("orga8171e7")
 #{
   set text(size: 0.85em)
   table(
@@ -217,7 +217,7 @@ Race conditions são \u{22}intencionais\u{22} e \u{22}inofensivas\u{22} para cas
 #v(0.6em)
 
 #text(weight: "bold", [Baseline]): binário sequencial puro (sem runtime OpenMP) para $T=1$.
-#heading(level: 2, outlined: false, numbering: none)[Afinidade de threads e medição de tempo] #label("org2c002b5")
+#heading(level: 2, outlined: false, numbering: none)[Afinidade de threads e medição de tempo] #label("orgce8a827")
 #text(weight: "bold", [Afinidade:])
 
 #list(list.item[$T <= 20$: #raw("OMP_PLACES=cores"), #raw("OMP_PROC_BIND=close") \u{2d}\u{2d} 1 thread por núcleo físico])#list(list.item[$T = 40$: #raw("OMP_PLACES=threads") \u{2d}\u{2d} hyperthreading completo])
@@ -227,10 +227,10 @@ Race conditions são \u{22}intencionais\u{22} e \u{22}inofensivas\u{22} para cas
 #text(weight: "bold", [Medição de tempo:])
 
 #list(list.item[Apenas o tempo de #raw("train()") \u{2d}\u{2d} exclui alocação, init e I\u{2f}O])#list(list.item[Paralelo: #raw("omp_get_wtime()") | Sequencial: #raw("clock_gettime(CLOCK_MONOTONIC)")])#list(list.item[Múltiplos blocos de replicação para estimar variância do escalonador])
-#heading(level: 1, outlined: false, numbering: none)[Resultados] #label("org7005fc9")
-#heading(level: 2, outlined: false, numbering: none)[Speedup por modo de sincronização] #label("orgd710e09")
+#heading(level: 1, outlined: false, numbering: none)[Resultados] #label("org8252352")
+#heading(level: 2, outlined: false, numbering: none)[Speedup por modo de sincronização] #label("org1fa8fba")
 #align(center, image("figs/speedup_blocks.svg", width: 200%, height: 10cm, fit: "contain"))
-#heading(level: 2, outlined: false, numbering: none)[Speedup: observações] #label("org9364edb")
+#heading(level: 2, outlined: false, numbering: none)[Speedup: observações] #label("orge7cc8db")
 #list(list.item[Quase ideal para 8 threads ou menos em alguns casos (hogwild, every1000).])
 
 #v(0.7em)
@@ -247,9 +247,9 @@ Race conditions são \u{22}intencionais\u{22} e \u{22}inofensivas\u{22} para cas
 #pause
 
 #list(list.item[Barreiras periódicas serializam parcialmente a execução nos modos sincronizados])
-#heading(level: 2, outlined: false, numbering: none)[Eficiência paralela S(T)\u{2f}T] #label("orgfef6736")
+#heading(level: 2, outlined: false, numbering: none)[Eficiência paralela S(T)\u{2f}T] #label("org20b9459")
 #align(center, image("figs/efficiency.svg", width: 200%, height: 10cm, fit: "contain"))
-#heading(level: 2, outlined: false, numbering: none)[Eficiência: observações] #label("org2601bf1")
+#heading(level: 2, outlined: false, numbering: none)[Eficiência: observações] #label("org8b5d592")
 #list(list.item[HOGWILD! mantém a #text(weight: "bold", [melhor eficiência]) em todos os grids: ~35\u{2d}\u{2d}45% com 40 threads no 100x100])
 
 #v(0.7em)
@@ -266,9 +266,9 @@ Race conditions são \u{22}intencionais\u{22} e \u{22}inofensivas\u{22} para cas
 #pause
 
 #list(list.item[Nenhuma configuração sustenta 50% de eficiência além de 8 threads no grid 10x10])
-#heading(level: 2, outlined: false, numbering: none)[Convergência] #label("orgf8f86a2")
+#heading(level: 2, outlined: false, numbering: none)[Convergência] #label("orgd5c8ced")
 #align(center, image("figs/conv_obstacles.svg", width: 200%, height: 11cm, fit: "contain"))
-#heading(level: 2, outlined: false, numbering: none)[Convergência: causa da degradação] #label("org506f60b")
+#heading(level: 2, outlined: false, numbering: none)[Convergência: causa da degradação] #label("org75b2e7b")
 Com $T$ threads e $E$ episódios fixos, cada thread treina com $E slash T$ episódios.
 Quando $E slash T < E_"min"$ o agente não aprende.
 
@@ -282,25 +282,29 @@ Quando $E slash T < E_"min"$ o agente não aprende.
 
 Mesmo HOGWILD! (que acumula updates de #text(weight: "bold", [todas]) as threads) falha com 50%
 de obstáculos, provavelmente pela perda de \u{22}esparsidade\u{22}.
-#heading(level: 2, outlined: false, numbering: none)[Causa da falha com 50% de obstáculos] #label("orgeeca3d3")
+#heading(level: 2, outlined: false, numbering: none)[Causa da falha com 50% de obstáculos (10.000 episódios)] #label("orge4144f7")
 #text(weight: "bold", [Causa raiz: desconto gamma anula o sinal de recompensa])
-
-#v(0.5em)
 
 Com 5000 obstáculos, o caminho mínimo tem ~300 passos. Com $gamma = 0.9$:
 
 #align(center, math.equation($gamma^300 = 0.9^300 approx 0$))
-#v(0.5em)
 
-A recompensa do goal #text(weight: "bold", [não chega ao estado inicial]) — Q\u{2d}target em $s_0$ para um episódio bem\u{2d}sucedido é $approx -10$ (ainda negativo).
+A recompensa do goal #text(weight: "bold", [não chega ao estado inicial]). Mesmo em episódios bem\u{2d}sucedidos, Q\u{2d}target em $s_0 approx -10$ (ainda negativo) — aumentar episódios não resolve.
 
-#v(0.5em)
+#v(0.3em)
 #pause
 
-#text(weight: "bold", [O paralelo é pior, mas o problema não é só dele:])
+#text(weight: "bold", [Medido empiricamente com 10.000 episódios e T=2:])
 
-#list(list.item[Sequencial: 7 de 10 seeds também não convergem])#list(list.item[Seeds que convergem no sequencial dependem de uma sequência de exploração \u{22}sortuda\u{22} da RNG])#list(list.item[No paralelo, os episódios são divididos entre threads e os Q\u{2d}tables são fundidos — quebrando exatamente essa sequência e tornando a falha universal])
-#heading(level: 2, outlined: false, numbering: none)[Speedup: execuções convergidas] #label("orgb6ef7bb")
+#list(list.item[570 episódios chegaram ao goal — Q($s_0$) ficou preso em $-83$ a $-87$ durante todas as 143 sincronizações])#list(list.item[Episódios falhos (9430) dominam: cada um empurra Q($s_0$) para $-90$; cada bem\u{2d}sucedido empurra para $-10$])
+
+#v(0.3em)
+#pause
+
+#text(weight: "bold", [Por que o paralelo falha universalmente e o sequencial às vezes não:])
+
+#list(list.item[Sequencial com certas seeds tem sequência de exploração \u{22}sortuda\u{22} que aprende uma rota local próxima ao goal])#list(list.item[O paralelo divide episódios entre threads e funde Q\u{2d}tables, quebrando essa sequência e tornando a falha consistente])
+#heading(level: 2, outlined: false, numbering: none)[Speedup: execuções convergidas] #label("orge5bf48e")
 #{
   set text(size: 0.62em)
   v(0.3em)
@@ -342,9 +346,9 @@ A recompensa do goal #text(weight: "bold", [não chega ao estado inicial]) — Q
   v(0.35em)
   text(size: 0.55em, fill: luma(130))[Speedup medio (10k ep., 0% obstaculos). "---" = nenhuma execucao convergiu.]
 }
-#heading(level: 2, outlined: false, numbering: none)[VTune: IPC e Memory Bound] #label("orgb484c14")
+#heading(level: 2, outlined: false, numbering: none)[VTune: IPC e Memory Bound] #label("org6146611")
 #align(center, image("figs/vtune.svg", width: 200%, height: 11cm, fit: "contain"))
-#heading(level: 2, outlined: false, numbering: none)[Análise de Cache (10x10)] #label("org7d62db9")
+#heading(level: 2, outlined: false, numbering: none)[Análise de Cache (10x10)] #label("org828b56a")
 Q\u{2d}Table do 10x10 ocupa #text(weight: "bold", [3,2 KB]) (100 estados x 4 ações x 8 bytes) \u{2d}\u{2d}
 cabe inteira em L1. Taxa de LLC\u{2d}miss medida com #raw("perf stat"):
 
@@ -369,7 +373,7 @@ cabe inteira em L1. Taxa de LLC\u{2d}miss medida com #raw("perf stat"):
 }
 
 Piora quando o número de threads ultrapassa 8, pois o gargalo se torna #text(weight: "bold", [tráfego de cache]), não falta de trabalho.
-#heading(level: 2, outlined: false, numbering: none)[Análise de Cache: interpretação] #label("orgca4e9f7")
+#heading(level: 2, outlined: false, numbering: none)[Análise de Cache: interpretação] #label("orgc7111f6")
 #text(weight: "bold", [Para $T <= 8$]): Todos modos tem LLC\u{2d}miss #text(weight: "bold", [menor]) pois Q\u{2d}Table única de 3,2 KB
 fica estável em L1\u{2f}L2. Modos sincronizados tem um miss L1 um pouco
 maior pois tem várias cópias das tableas.
@@ -387,7 +391,7 @@ LLC\u{2d}miss.
 frequentemente o socket 1. Statespace fica em 23,1% porque os threads
 do socket 1 carregam a cópia local uma vez e a reutilizam por 100
 episódios.
-#heading(level: 2, outlined: false, numbering: none)[Análise de Cache (100x100)] #label("orgb420f1f")
+#heading(level: 2, outlined: false, numbering: none)[Análise de Cache (100x100)] #label("orgb7a2e6e")
 Q\u{2d}Table ocupa #text(weight: "bold", [320 KB]), excede L1 (32 KB) e L2 (~256 KB), cabe no LLC
 (~20 MB). Baseline sequencial: 2,82% de L1\u{2d}miss (vs. 0,18% no 10x10).
 
@@ -436,7 +440,7 @@ Q\u{2d}Table ocupa #text(weight: "bold", [320 KB]), excede L1 (32 KB) e L2 (~256
 )
 
 Media dos tres schedules.
-#heading(level: 2, outlined: false, numbering: none)[Análise de Cache 100x100: interpretação] #label("orgdb1781b")
+#heading(level: 2, outlined: false, numbering: none)[Análise de Cache 100x100: interpretação] #label("orgb1ee384")
 #list(list.item[$T <= 8$: todos no socket 0, LLC\u{2d}miss $<$ 0,3% em todos os modos])
 
 #v(0.45em)
@@ -461,14 +465,14 @@ total; threads do socket 1 carregam cópia local uma vez e não voltam])
 
 #list(list.item[L1\u{2d}miss alto no #text(weight: "bold", [every10]) (10\u{2d}15%): copia 320 KB a cada 10 episódios,
 expulsa dados úteis do L1 repetidamente])
-#heading(level: 2, outlined: false, numbering: none)[Schedule, chunk e obstáculos] #label("orgf1d8f76")
+#heading(level: 2, outlined: false, numbering: none)[Schedule, chunk e obstáculos] #label("orgd4a8db3")
 #grid(
   columns: (1fr, 1fr),
   gutter: 0.8em,
   align(center, image("figs/sched_impact.svg", width: 100%, height: 9cm, fit: "contain")),
   align(center, image("figs/obs_speedup.svg",  width: 100%, height: 9cm, fit: "contain")),
 )
-#heading(level: 2, outlined: false, numbering: none)[Schedule e chunk: não são fatores dominantes] #label("org97b0ec0")
+#heading(level: 2, outlined: false, numbering: none)[Schedule e chunk: não são fatores dominantes] #label("orgafd4439")
 #list(list.item[Os três schedules produzem speedup #text(weight: "bold", [praticamente idêntico]): durações de episódio
 homogêneas, carga equilibrada independente da política])
 
@@ -485,12 +489,12 @@ chunk=10 e auto se comportam de forma equivalente])
 
 #list(list.item[Obstáculos: comparar speedup entre 0% e 50% é #text(weight: "bold", [injusto]), ganho aparente com 50%
 reflete apenas que há mais trabalho total a dividir])
-#heading(level: 1, outlined: false, numbering: none)[Conclusão] #label("org6bdab1d")
-#heading(level: 2, outlined: false, numbering: none)[Conclusão] #label("orgf29fe76")
+#heading(level: 1, outlined: false, numbering: none)[Conclusão] #label("org5a11f42")
+#heading(level: 2, outlined: false, numbering: none)[Conclusão] #label("org48d09f4")
 #list(list.item[#text(weight: "bold", [Gargalos principal]): divisão de episódios e miss. Com $T$ threads e $E$ fixos,
 cada thread treina com $E slash T$ \u{2d}\u{2d} abaixo do limiar, agente não converge])#list(list.item[#text(weight: "bold", [Problemas de memória entre cache]): gargalo é coerência de cache, LLC\u{2d}miss explode
 de \u{3c}1,2% para 23\u{2d}40% após $T=8$])#list(list.item[#text(weight: "bold", [HOGWILD!]) obteve maior speedup bruto (até #text(weight: "bold", [17x]) com 40 threads em 100x100),
 mas não converge com 50% de obstáculos])#list(list.item[Modos sincronizados com intervalos longos (#text(weight: "bold", [every1000]), #text(weight: "bold", [statespace])) preservam
 melhor o comportamento de cache entre syncs, mas convergem menos])#list(list.item[Schedule e chunk: #text(weight: "bold", [não são fatores dominantes]) (\u{3c}2% de impacto no speedup)])
-#heading(level: 2, outlined: false, numbering: none)[] #label("orgfdf6a7c")
+#heading(level: 2, outlined: false, numbering: none)[] #label("orgba79afb")
 #text(size: 2.8em, weight: "bold", "Perguntas?")

@@ -402,33 +402,37 @@ Quando $E slash T < E_"min"$ o agente não aprende.
 Mesmo HOGWILD! (que acumula updates de *todas* as threads) falha com 50%
 de obstáculos, provavelmente pela perda de "esparsidade".
 
-** Causa da falha com 50% de obstáculos
+** Causa da falha com 50% de obstáculos (10.000 episódios)
 
 *Causa raiz: desconto gamma anula o sinal de recompensa*
-
-#+begin_export typst
-#v(0.5em)
-#+end_export
 
 Com 5000 obstáculos, o caminho mínimo tem ~300 passos. Com $gamma = 0.9$:
 
 #+begin_export typst
 #align(center, math.equation($gamma^300 = 0.9^300 approx 0$))
-#v(0.5em)
 #+end_export
 
-A recompensa do goal *não chega ao estado inicial* — Q-target em $s_0$ para um episódio bem-sucedido é $approx -10$ (ainda negativo).
+A recompensa do goal *não chega ao estado inicial*. Mesmo em episódios bem-sucedidos, Q-target em $s_0 approx -10$ (ainda negativo) — aumentar episódios não resolve.
 
 #+begin_export typst
-#v(0.5em)
+#v(0.3em)
 #pause
 #+end_export
 
-*O paralelo é pior, mas o problema não é só dele:*
+*Medido empiricamente com 10.000 episódios e T=2:*
 
-- Sequencial: 7 de 10 seeds também não convergem
-- Seeds que convergem no sequencial dependem de uma sequência de exploração "sortuda" da RNG
-- No paralelo, os episódios são divididos entre threads e os Q-tables são fundidos — quebrando exatamente essa sequência e tornando a falha universal
+- 570 episódios chegaram ao goal — Q($s_0$) ficou preso em $-83$ a $-87$ durante todas as 143 sincronizações
+- Episódios falhos (9430) dominam: cada um empurra Q($s_0$) para $-90$; cada bem-sucedido empurra para $-10$
+
+#+begin_export typst
+#v(0.3em)
+#pause
+#+end_export
+
+*Por que o paralelo falha universalmente e o sequencial às vezes não:*
+
+- Sequencial com certas seeds tem sequência de exploração "sortuda" que aprende uma rota local próxima ao goal
+- O paralelo divide episódios entre threads e funde Q-tables, quebrando essa sequência e tornando a falha consistente
 
 ** Speedup: execuções convergidas
 
