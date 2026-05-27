@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 # -*- mode: org -*-
 
-#+TITLE: Paralelizacao do Q-Learning com OpenMP
-#+AUTHOR: Rayan Raddatz de Matos, Eduardo Magnus Lazuta, Enzo Lisboa Peixoto
+#+TITLE: Paralelização do Q-Learning com OpenMP
+#+AUTHOR: Rayan Raddatz de Matos, Eduardo Magnus Lazuta, Enzo Lisbôa Peixoto
 #+DATE: <2026-05-27 Wed>
 #+LANGUAGE: pt
 #+OPTIONS: toc:nil num:nil ^:nil
@@ -10,10 +10,10 @@
 #+TYPST: #import "@preview/touying:0.7.3": *
 #+TYPST: #import themes.simple: *
 #+TYPST: #import "@preview/numbly:0.1.0": numbly
-#+TYPST: #let talk-title = [Paralelizacao do Algoritmo Q-Learning com OpenMP]
-#+TYPST: #let talk-authors = "Eduardo Magnus Lazuta, Enzo Lisboa Peixoto"
+#+TYPST: #let talk-title = [Paralelização do Algoritmo Q-Learning com OpenMP]
+#+TYPST: #let talk-authors = "Eduardo Magnus Lazuta, Enzo Lisbôa Peixoto"
 #+TYPST: #let talk-main-author = "Rayan Raddatz de Matos"
-#+TYPST: #let talk-event = [INF/UFRGS -- Computacao Paralela]
+#+TYPST: #let talk-event = [INF/UFRGS -- Computação Paralela]
 #+TYPST: #let talk-date = "2026-05-27"
 #+TYPST: #show: simple-theme.with(
 #+TYPST:   aspect-ratio: "16-9",
@@ -66,24 +66,24 @@
 ** Agenda
 
 - Problema e Algoritmo
-- Paralelizacao
+- Paralelização
 - Metodologia Experimental
 - Resultados
-- Conclusao
+- Conclusão
 
 * Problema e Algoritmo
 
 ** Q-Learning: pathfinding em grid
 
-Agente aprende a navegar de $(0,0)$ ate $(L-1, C-1)$ em um grid $L times C$
-com obstaculos. Acoes: cima, baixo, esquerda, direita.
+Agente aprende a navegar de $(0,0)$ até $(L-1, C-1)$ em um grid $L times C$
+com obstáculos. Ações: cima, baixo, esquerda, direita.
 
 #+begin_export typst
 #v(0.8em)
 #pause
 #+end_export
 
-A cada passo, a Q-Table e atualizada pela equacao de Bellman:
+A cada passo, a Q-Table é atualizada pela equação de Bellman:
 
 #+begin_export typst
 #v(0.4em)
@@ -97,11 +97,11 @@ A cada passo, a Q-Table e atualizada pela equacao de Bellman:
 #pause
 #+end_export
 
-Apos o treinamento, a politica otima e extraida como
+Após o treinamento, a política ótima é extraída como
 $pi(s) = arg max_a Q(s,a)$.
 
 
-** Estrutura de um episodio
+** Estrutura de um episódio
 
 #+begin_export typst
 #grid(
@@ -111,10 +111,10 @@ $pi(s) = arg max_a Q(s,a)$.
 #set list(spacing: 0.7em)
 #list(
   [Parte do estado inicial $s_0$],
-  [Seleciona acao via epsilon-greedy],
+  [Seleciona ação via epsilon-greedy],
   [Transita para $s'$, recebe recompensa $r$],
-  [Atualiza $Q(s,a)$ pela equacao de Bellman],
-  [Repete ate atingir o objetivo ou esgotar passos],
+  [Atualiza $Q(s,a)$ pela equação de Bellman],
+  [Repete até atingir o objetivo ou esgotar passos],
 )
 ],
 [
@@ -131,44 +131,44 @@ Grids testados: *10x10, 50x50, 100x100*
 )
 #+end_export
 
-* Paralelizacao
+* Paralelização
 
-** Qual nivel de paralelismo?
+** Qual nível de paralelismo?
 
-Tres opcoes foram consideradas:
+Três opções foram consideradas:
 
 #+begin_export typst
 #v(0.6em)
 #+end_export
 
-- *Acoes* (argmax de 4 acoes): descartada -- overhead supera o ganho
-
-#+begin_export typst
-#v(0.6em)
-#pause
-#+end_export
-
-- *Steps* (passos do episodio): descartada -- cada step depende do anterior
+- *Ações* (argmax de 4 ações): descartada -- overhead supera o ganho
 
 #+begin_export typst
 #v(0.6em)
 #pause
 #+end_export
 
-- *Episodios*: *escolhida* -- episodios sao independentes; distribuicao direta via =omp for=
+- *Steps* (passos do episódio): descartada -- cada step depende do anterior
 
 #+begin_export typst
 #v(0.6em)
 #pause
 #+end_export
 
-Mas paralelizar sem sincronizacao nao basta: com $T$ threads e $E$ episodios,
-cada thread aprende como se tivesse apenas $E slash T$ episodios.
+- *Episódios*: *escolhida* -- episódios são independentes; distribuição direta via =omp for=
+
+#+begin_export typst
+#v(0.6em)
+#pause
+#+end_export
+
+Mas paralelizar sem sincronização não basta: com $T$ threads e $E$ episódios,
+cada thread aprende como se tivesse apenas $E slash T$ episódios.
 
 
-** Sincronizacao Periodica
+** Sincronização Periódica
 
-Cada thread mantem uma *Q-Table local*, treina um lote de =sync_interval= episodios
+Cada thread mantém uma *Q-Table local*, treina um lote de =sync_interval= episódios
 e funde os deltas na Q-Table global:
 
 #+begin_export typst
@@ -199,15 +199,15 @@ for (state ...) for (action ...) {
 preservando o $alpha$ efetivo quando =chunk_size < T=.
 
 
-** Heuristicas de sync_interval
+** Heurísticas de sync_interval
 
-Duas estrategias automaticas implementadas em =train()=:
+Duas estratégias automáticas implementadas em =train()=:
 
 #+begin_export typst
 #v(0.8em)
 #+end_export
 
-- *sqrt*: =sync_interval = sqrt(N/T)= -- equilibra overhead de barreira e divergencia local (inspirado em limites de regret para SGD paralelo)
+- *sqrt*: =sync_interval = sqrt(N/T)= -- equilibra overhead de barreira e divergência local (inspirado em limites de regret para SGD paralelo)
 
 #+begin_export typst
 #v(0.8em)
@@ -221,12 +221,12 @@ Duas estrategias automaticas implementadas em =train()=:
 #pause
 #+end_export
 
-Alem disso, testamos valores fixos: *every10* (=i=10=) e *every1000* (=i=1000=).
+Além disso, testamos valores fixos: *every10* (=i=10=) e *every1000* (=i=1000=).
 
 
 ** HOGWILD!
 
-Todas as threads leem e escrevem na *mesma Q-Table sem nenhum lock*:
+Todas as threads leem e escrevem na *mesma Q-Table sem nenhuma sincronização*:
 
 #+begin_export typst
 #v(0.5em)
@@ -241,7 +241,7 @@ local_ql.rand_seed = seed + tid;
 
 #pragma omp for schedule(runtime)
 for (episode = 0; episode < N; episode++)
-    run_episode(&local_ql, episode);  /* sem lock */
+    run_episode(&local_ql, episode);  /* sem sincronizacao */
 ```
 ]
 #+end_export
@@ -251,13 +251,7 @@ for (episode = 0; episode < N; episode++)
 #pause
 #+end_export
 
-Race conditions sao *intencionais e inofensivas* porque:
-
-- *Esparsidade*: cada episodio visita fracao pequena dos $L times C$ estados
-- *Escala*: updates ponderados por $alpha <= 0.1$ -- sobrescrever um e ruido $O(alpha)$
-- *Simetria*: ambos os valores concorrentes sao gradientes validos
-
-Ref: Niu et al., *Hogwild!*, NIPS 2011.
+Race conditions são "intencionais" e "inofensivas" para casos esparsos.
 
 * Metodologia Experimental
 
@@ -270,14 +264,14 @@ Ref: Niu et al., *Hogwild!*, NIPS 2011.
     columns: (auto, auto, 1fr),
     stroke: none,
     table.hline(),
-    table.header([*Fator*], [*Niveis*], [*Motivacao*]),
+    table.header([*Fator*], [*Níveis*], [*Motivação*]),
     table.hline(),
     [Threads],        [1, 2, 4, 8, 16, 20, 40],        [Do serial ao hyperthreading completo],
-    [Tamanho grid],   [10, 50, 100],                    [Espaco de estados pequeno/medio/grande],
-    [Modo de sync],   [sqrt, statespace, hogwild, 10, 1000],  [5 estrategias de paralelizacao],
-    [Episodios],      [5000, 10000],                    [5k instavel, 10k converge melhor],
-    [Obstaculos],     [0%, 50%],                        [Grid livre vs. alta densidade],
-    [Schedule OMP],   [static, guided, dynamic],        [Politicas de distribuicao],
+    [Tamanho grid],   [10, 50, 100],                    [Espaço de estados pequeno/médio/grande],
+    [Modo de sync],   [sqrt, statespace, hogwild, 10, 1000],  [5 estratégias de paralelização],
+    [Episódios],      [5000, 10000],                    [5k instável, 10k converge melhor],
+    [Obstáculos],     [0%, 50%],                        [Grid livre vs. alta densidade],
+    [Schedule OMP],   [static, guided, dynamic],        [Políticas de distribuição],
     [Chunk],          [0 (auto), 1, 10],                [Granularidade do chunking],
     table.hline(),
   )
@@ -288,14 +282,14 @@ Ref: Niu et al., *Hogwild!*, NIPS 2011.
 #v(0.6em)
 #+end_export
 
-*Baseline*: binario sequencial puro (sem runtime OpenMP) para $T=1$.
+*Baseline*: binário sequencial puro (sem runtime OpenMP) para $T=1$.
 
 
-** Afinidade de threads e medicao de tempo
+** Afinidade de threads e medição de tempo
 
 *Afinidade:*
 
-- $T <= 20$: =OMP_PLACES=cores=, =OMP_PROC_BIND=close= -- 1 thread por nucleo fisico
+- $T <= 20$: =OMP_PLACES=cores=, =OMP_PROC_BIND=close= -- 1 thread por núcleo físico
 
 - $T = 40$: =OMP_PLACES=threads= -- hyperthreading completo
 
@@ -303,24 +297,32 @@ Ref: Niu et al., *Hogwild!*, NIPS 2011.
 #v(1em)
 #+end_export
 
-*Medicao de tempo:*
+*Medição de tempo:*
 
-- Apenas o tempo de =train()= -- exclui alocacao, init e I/O
+- Apenas o tempo de =train()= -- exclui alocação, init e I/O
 
 - Paralelo: =omp_get_wtime()= | Sequencial: =clock_gettime(CLOCK_MONOTONIC)=
 
-- Multiplos blocos de replicacao para estimar variancia do escalonador
+- Múltiplos blocos de replicação para estimar variância do escalonador
 
 * Resultados
 
-** Speedup por modo de sincronizacao
+** Speedup por modo de sincronização
 
 #+begin_export typst
 #align(center, image("figs/speedup_blocks.svg", width: 200%, height: 10cm, fit: "contain"))
 #+end_export
 
 
-** Speedup: observacoes
+** Speedup: observações
+
+
+- Quase ideal para 8 threads ou menos em alguns casos (hogwild, every1000).
+
+#+begin_export typst
+#v(0.7em)
+#pause
+#+end_export
 
 - *10x10*: satura em ~4--5x a partir de 8 threads; trabalho por thread insuficiente para amortizar overhead
 
@@ -329,115 +331,151 @@ Ref: Niu et al., *Hogwild!*, NIPS 2011.
 #pause
 #+end_export
 
-- *100x100*: HOGWILD! atinge ate *17x com 40 threads*; modos sincronizados ficam abaixo de 10x
+- *100x100*: HOGWILD! atinge até *17x com 40 threads*; modos sincronizados ficam abaixo de 10x
 
 #+begin_export typst
 #v(0.7em)
 #pause
 #+end_export
 
-- Barreiras periodicas serializam parcialmente a execucao nos modos sincronizados
-
-#+begin_export typst
-#v(0.7em)
-#pause
-#+end_export
-
-- Grid 10x10 com T=2: eficiencia *super-linear* (efeito de cache com Q-Table de 3,2 KB)
+- Barreiras periódicas serializam parcialmente a execução nos modos sincronizados
 
 
-** Eficiencia paralela S(T)/T
+** Eficiência paralela S(T)/T
 
 #+begin_export typst
 #align(center, image("figs/efficiency.svg", width: 200%, height: 10cm, fit: "contain"))
 #+end_export
 
 
-** Eficiencia: observacoes
+** Eficiência: observações
 
-- HOGWILD! mantem a *melhor eficiencia* em todos os grids: ~35--45% com 40 threads no 100x100
-
-#+begin_export typst
-#v(0.7em)
-#pause
-#+end_export
-
-- *every10* (sync a cada 10 eps): *pior eficiencia* -- overhead de barreiras frequentes supera o ganho
+- HOGWILD! mantém a *melhor eficiência* em todos os grids: ~35--45% com 40 threads no 100x100
 
 #+begin_export typst
 #v(0.7em)
 #pause
 #+end_export
 
-- every1000 e statespace ficam no intermediario: sincronizam menos e amortizam o custo
+- *every10* (sync a cada 10 eps): *pior eficiência* pois overhead de barreiras frequentes supera o ganho
 
 #+begin_export typst
 #v(0.7em)
 #pause
 #+end_export
 
-- Nenhuma configuracao sustenta 50% de eficiencia alem de 8 threads no grid 10x10
-
-
-** Analise de Cache (10x10)
-
-Q-Table do 10x10 ocupa *3,2 KB* (100 estados x 4 acoes x 8 bytes) -- cabe inteira em L1.
+- every1000 e statespace ficam no intermediário: sincronizam menos e amortizam o custo
 
 #+begin_export typst
-#v(0.6em)
+#v(0.7em)
+#pause
 #+end_export
 
-Taxa de LLC-miss medida com =perf stat=:
+- Nenhuma configuração sustenta 50% de eficiência além de 8 threads no grid 10x10
+
+
+** Convergência
 
 #+begin_export typst
-#v(0.4em)
+#align(center, image("figs/conv_obstacles.svg", width: 200%, height: 11cm, fit: "contain"))
+#+end_export
+
+** Convergência: causa da degradação
+
+Com $T$ threads e $E$ episódios fixos, cada thread treina com $E slash T$ episódios.
+Quando $E slash T < E_"min"$ o agente não aprende.
+
+#+begin_export typst
+#v(0.8em)
+#pause
+#+end_export
+
+- *0% de obstáculos*: todos os modos convergem para poucos threads; degrada com o aumento
+
+- *50% de obstáculos*: nenhuma configuração paralela convergiu para grids grandes
+
+#+begin_export typst
+#v(0.8em)
+#pause
+#+end_export
+
+Mesmo HOGWILD! (que acumula updates de *todas* as threads) falha com 50%
+de obstáculos, provavelmente pela perda de "esparsidade".
+
+** Causa da falha com 50% de obstáculos
+
+*Causa raiz: desconto gamma anula o sinal de recompensa*
+
+#+begin_export typst
+#v(0.5em)
+#+end_export
+
+Com 5000 obstáculos, o caminho mínimo tem ~300 passos. Com $gamma = 0.9$:
+
+#+begin_export typst
+#align(center, math.equation($gamma^300 = 0.9^300 approx 0$))
+#v(0.5em)
+#+end_export
+
+A recompensa do goal *não chega ao estado inicial* — Q-target em $s_0$ para um episódio bem-sucedido é $approx -10$ (ainda negativo).
+
+#+begin_export typst
+#v(0.5em)
+#pause
+#+end_export
+
+*O paralelo é pior, mas o problema não é só dele:*
+
+- Sequencial: 7 de 10 seeds também não convergem
+- Seeds que convergem no sequencial dependem de uma sequência de exploração "sortuda" da RNG
+- No paralelo, os episódios são divididos entre threads e os Q-tables são fundidos — quebrando exatamente essa sequência e tornando a falha universal
+
+** Speedup: execuções convergidas
+
+#+begin_export typst
 #{
-  set text(size: 0.82em)
-  table(
-    columns: (auto, auto, auto, auto),
-    stroke: none,
-    table.hline(),
-    table.header([*Threads*], [*sqrt*], [*statespace*], [*hogwild*]),
-    table.hline(),
-    [2],  [0,80%], [1,11%], [0,44%],
-    [4],  [0,70%], [0,79%], [0,18%],
-    [8],  [0,17%], [0,18%], [0,11%],
-    table.hline(),
-    [16], [30,9%], [23,1%], [36,7%],
-    [20], [29,1%], [22,9%], [36,4%],
-    [40], [40,7%], [28,5%], [35,9%],
-    table.hline(),
+  set text(size: 0.62em)
+  v(0.3em)
+  grid(
+    columns: (1fr, 1fr),
+    gutter: 1.4em,
+    table(
+      columns: (auto, auto, auto, auto, auto, auto, auto, auto),
+      stroke: none,
+      table.hline(),
+      table.header([*Grid*],[*Config*],[*2*],[*4*],[*8*],[*16*],[*20*],[*40*]),
+      table.hline(),
+      [10x10],[every10],   [1,54],[1,63],[1,47],[0,59],[0,51],[0,49],
+      [10x10],[every1000], [*2,95*],[*4,77*],[*7,11*],[7,09],[6,69],[4,73],
+      [10x10],[hogwild],   [*2,43*],[*3,67*],[5,11],[3,00],[2,91],[2,78],
+      [10x10],[sqrt],      [*2,62*],[3,37],[3,42],[1,29],[0,97],[1,32],
+      [10x10],[statespace],[*2,75*],[*3,95*],[5,07],[3,51],[3,07],[2,34],
+      table.hline(),
+    ),
+    table(
+      columns: (auto, auto, auto, auto, auto, auto, auto, auto),
+      stroke: none,
+      table.hline(),
+      table.header([*Grid*],[*Config*],[*2*],[*4*],[*8*],[*16*],[*20*],[*40*]),
+      table.hline(),
+      [50x50],[every10],   [1,08],[1,11],[0,98],[0,65],[0,59],[0,38],
+      [50x50],[every1000], [*2,21*],[2,96],[3,76],[---], [---], [---],
+      [50x50],[hogwild],   [*2,32*],[*4,04*],[*7,40*],[9,19],[10,12],[10,65],
+      [50x50],[sqrt],      [1,98],[2,33],[2,20],[1,19],[---], [---],
+      [50x50],[statespace],[*2,20*],[2,91],[3,58],[4,16],[---], [---],
+      table.hline(),
+      [100x100],[every10],   [0,90],[0,85],[---],[---],[---],[---],
+      [100x100],[every1000], [*1,97*],[2,49],[---],[---],[---],[---],
+      [100x100],[hogwild],   [*2,43*],[*4,24*],[*8,00*],[11,45],[13,88],[18,14],
+      [100x100],[sqrt],      [*1,77*],[1,99],[---],[---],[---],[---],
+      table.hline(),
+    ),
   )
+  v(0.35em)
+  text(size: 0.55em, fill: luma(130))[Speedup medio (10k ep., 0% obstaculos). "---" = nenhuma execucao convergiu.]
 }
 #+end_export
 
-#+begin_export typst
-#v(0.4em)
-#+end_export
-
-Ponto de ruptura em $T in [8, 16]$ confirma: gargalo e *trafego de cache*, nao falta de trabalho.
-
-
-** Analise de Cache: interpretacao
-
-*Para $T <= 8$*: hogwild tem LLC-miss *menor* -- Q-Table unica de 3,2 KB fica
-estavel em L1/L2. Modos federados tem copias separadas por thread, aumentando o footprint.
-
-#+begin_export typst
-#v(0.8em)
-#pause
-#+end_export
-
-*Para $T >= 16$*: hogwild passa a ter *mais* LLC-miss (36,7%) -- cada escrita invalida
-a linha de cache nos demais nucleos (protocolo MESI). Statespace aguenta melhor (23,1%)
-pois Q-Tables locais ficam isoladas por mais tempo entre syncs.
-
-#+begin_export typst
-#v(0.8em)
-#pause
-#+end_export
-
-Confirmado pelo VTune: *Memory Bound alto* e *IPC baixo* no 10x10 com muitas threads.
 
 
 ** VTune: IPC e Memory Bound
@@ -447,37 +485,151 @@ Confirmado pelo VTune: *Memory Bound alto* e *IPC baixo* no 10x10 com muitas thr
 #+end_export
 
 
-** Convergencia
+** Análise de Cache (10x10)
+
+Q-Table do 10x10 ocupa *3,2 KB* (100 estados x 4 ações x 8 bytes) --
+cabe inteira em L1. Taxa de LLC-miss medida com =perf stat=:
 
 #+begin_export typst
-#align(center, image("figs/conv_obstacles.svg", width: 200%, height: 11cm, fit: "contain"))
+#v(0.3em)
+#{
+  set text(size: 0.72em)
+  table(
+    columns: (auto, auto, auto, auto, auto, auto, auto),
+    stroke: none,
+    table.hline(),
+    table.header([*T*], [*sq-L1*], [*sq-LLC*], [*spc-L1*], [*spc-LLC*], [*hog-L1*], [*hog-LLC*]),
+    table.hline(),
+    [2],  [1,12%], [0,80%], [1,10%], [1,11%], [7,42%],  [0,44%],
+    [4],  [3,87%], [0,70%], [4,10%], [0,79%], [8,53%],  [0,18%],
+    [8],  [6,37%], [0,17%], [5,15%], [0,18%], [23,20%], [0,11%],
+    table.hline(),
+    [16], [3,95%], [30,9%], [4,64%], [23,1%], [5,99%],  [36,7%],
+    [20], [5,08%], [29,1%], [11,09%],[22,9%], [1,38%],  [36,4%],
+    [40], [1,99%], [40,7%], [1,98%], [28,5%], [4,17%],  [35,9%],
+    table.hline(),
+  )
+}
 #+end_export
 
+Piora quando o número de threads ultrapassa 8, pois o gargalo se torna *tráfego de cache*, não falta de trabalho.
 
-** Convergencia: causa da degradacao
 
-Com $T$ threads e $E$ episodios fixos, cada thread treina com $E slash T$ episodios.
-Quando $E slash T < E_"min"$ o agente nao aprende.
+** Análise de Cache: interpretação
+
+*Para $T <= 8$*: Todos modos tem LLC-miss *menor* pois Q-Table única de 3,2 KB
+fica estável em L1/L2. Modos sincronizados tem um miss L1 um pouco
+maior pois tem várias cópias das tableas.
 
 #+begin_export typst
-#v(0.8em)
 #pause
 #+end_export
 
-- *0% de obstaculos*: todos os modos convergem para poucos threads; degrada com o aumento
-
-- *50% de obstaculos*: nenhuma configuracao paralela convergiu para grids grandes
+*Sockets*: Hype é dual-socket (2x Xeon E5-2650 v3, 10
+núcleos/socket). Com =OMP_PROC_BIND=close=, $T <= 10$ fica inteiro no
+socket 0; $T = 16$ já usa 6 núcleos do socket 1. Por isso vemos mais
+LLC-miss.
 
 #+begin_export typst
-#v(0.8em)
 #pause
 #+end_export
 
-Mesmo HOGWILD! (que acumula updates de *todas* as threads) falha com 50% de obstaculos:
-race conditions corrompem o aprendizado em ambientes densos.
+*Para $T >= 16$*: hogwild é o pior (36,7%), sem cópia local, acessa
+frequentemente o socket 1. Statespace fica em 23,1% porque os threads
+do socket 1 carregam a cópia local uma vez e a reutilizam por 100
+episódios.
 
 
-** Schedule, chunk e obstaculos
+** Análise de Cache (100x100)
+
+Q-Table ocupa *320 KB*, excede L1 (32 KB) e L2 (~256 KB), cabe no LLC
+(~20 MB). Baseline sequencial: 2,82% de L1-miss (vs. 0,18% no 10x10).
+
+#+begin_export typst
+#v(0.3em)
+#grid(
+  columns: (1fr, 1fr),
+  gutter: 1em,
+[
+#set text(size: 0.65em)
+*L1-miss*
+#table(
+  columns: (auto, auto, auto, auto, auto, auto),
+  stroke: none,
+  table.hline(),
+  table.header([*T*], [*sqrt*], [*ev10*], [*ev1k*], [*spc*], [*hog*]),
+  table.hline(),
+  [2],  [5,63%],  [10,27%], [3,39%], [3,28%], [4,50%],
+  [4],  [6,27%],  [10,77%], [2,91%], [2,62%], [4,30%],
+  [8],  [7,80%],  [11,59%], [2,64%], [2,09%], [5,41%],
+  table.hline(),
+  [16], [11,79%], [13,74%], [1,98%], [2,18%], [4,36%],
+  [20], [12,85%], [14,59%], [2,83%], [2,17%], [3,78%],
+  [40], [11,03%], [12,43%], [3,01%], [2,01%], [2,56%],
+  table.hline(),
+)
+],
+[
+#set text(size: 0.65em)
+*LLC-miss*
+#table(
+  columns: (auto, auto, auto, auto, auto, auto),
+  stroke: none,
+  table.hline(),
+  table.header([*T*], [*sqrt*], [*ev10*], [*ev1k*], [*spc*], [*hog*]),
+  table.hline(),
+  [2],  [0,06%], [0,01%], [0,08%], [0,08%], [0,00%],
+  [4],  [0,12%], [0,03%], [0,29%], [0,05%], [0,00%],
+  [8],  [0,01%], [0,02%], [0,04%], [0,05%], [0,20%],
+  table.hline(),
+  [16], [7,01%],  [6,81%],  [3,12%],  [1,59%],  [35,44%],
+  [20], [22,43%], [23,00%], [14,03%], [5,43%],  [33,49%],
+  [40], [27,65%], [28,38%], [16,47%], [2,61%],  [60,77%],
+  table.hline(),
+)
+],
+)
+#+end_export
+
+Media dos tres schedules.
+
+
+** Análise de Cache 100x100: interpretação
+
+- $T <= 8$: todos no socket 0, LLC-miss $<$ 0,3% em todos os modos
+
+#+begin_export typst
+#v(0.45em)
+#pause
+#+end_export
+
+- *Hogwild* (60,8% com 40T): sem cópia local, cada escrita do socket 1
+  invalida linhas no socket 0
+
+#+begin_export typst
+#v(0.45em)
+#pause
+#+end_export
+
+- *Statespace* (2,6% com 40T): intervalo $= 10^4$, episódios = uma sync
+  total; threads do socket 1 carregam cópia local uma vez e não voltam
+
+#+begin_export typst
+#v(0.45em)
+#pause
+#+end_export
+
+- *Every1000* (16,5%) melhor que sqrt (27,7%) -- menos cruzamentos de QPI por merge
+
+#+begin_export typst
+#v(0.45em)
+#pause
+#+end_export
+
+- L1-miss alto no *every10* (10-15%): copia 320 KB a cada 10 episódios,
+  expulsa dados úteis do L1 repetidamente
+
+** Schedule, chunk e obstáculos
 
 #+begin_export typst
 #grid(
@@ -488,65 +640,50 @@ race conditions corrompem o aprendizado em ambientes densos.
 )
 #+end_export
 
+** Schedule e chunk: não são fatores dominantes
 
-** Schedule e chunk: nao sao fatores dominantes
-
-- Os tres schedules produzem speedup *praticamente identico*: duracoes de episodio
-  homogeneas, carga equilibrada independente da politica
-
-#+begin_export typst
-#v(0.7em)
-#+end_export
-
-- Diferenca geral permanece *<2% no speedup medio*
+- Os três schedules produzem speedup *praticamente idêntico*: durações de episódio
+  homogêneas, carga equilibrada independente da política
 
 #+begin_export typst
 #v(0.7em)
 #+end_export
 
-- Chunk=1: leve degradacao em grids pequenos (overhead por episodio);
+- Diferença geral permanece *<2% no speedup médio*
+
+#+begin_export typst
+#v(0.7em)
+#+end_export
+
+- Chunk=1: leve degradação em grids pequenos (overhead por episódio);
   chunk=10 e auto se comportam de forma equivalente
 
 #+begin_export typst
 #v(0.7em)
 #+end_export
 
-- Obstaculos: comparar speedup entre 0% e 50% e *injusto* -- ganho aparente com 50%
-  reflete apenas que ha mais trabalho total a dividir
+- Obstáculos: comparar speedup entre 0% e 50% é *injusto*, ganho aparente com 50%
+  reflete apenas que há mais trabalho total a dividir
 
-* Conclusao
 
-** Conclusao
 
-- *Gargalo principal*: divisao de episodios. Com $T$ threads e $E$ fixos,
-  cada thread treina com $E slash T$ -- abaixo do limiar, agente nao converge
+* Conclusão
 
-#+begin_export typst
-#v(0.7em)
-#+end_export
+** Conclusão
 
-- *Grid 10x10*: gargalo e coerencia de cache -- LLC-miss explode
-  de <1,2% para 23--40% entre $T=8$ e $T=16$
+- *Gargalos principal*: divisão de episódios e miss. Com $T$ threads e $E$ fixos,
+  cada thread treina com $E slash T$ -- abaixo do limiar, agente não converge
 
-#+begin_export typst
-#v(0.7em)
-#+end_export
+- *Problemas de memória entre cache*: gargalo é coerência de cache, LLC-miss explode
+  de <1,2% para 23-40% após $T=8$
 
-- *HOGWILD!* obteve maior speedup bruto (ate *17x* com 40 threads em 100x100),
-  mas nao converge com 50% de obstaculos
-
-#+begin_export typst
-#v(0.7em)
-#+end_export
+- *HOGWILD!* obteve maior speedup bruto (até *17x* com 40 threads em 100x100),
+  mas não converge com 50% de obstáculos
 
 - Modos sincronizados com intervalos longos (*every1000*, *statespace*) preservam
   melhor o comportamento de cache entre syncs, mas convergem menos
 
-#+begin_export typst
-#v(0.7em)
-#+end_export
-
-- Schedule e chunk: *nao sao fatores dominantes* (<2% de impacto no speedup)
+- Schedule e chunk: *não são fatores dominantes* (<2% de impacto no speedup)
 
 
 ** @@typst:@@
