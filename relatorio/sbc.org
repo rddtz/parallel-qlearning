@@ -20,7 +20,7 @@
 #+LATEX_HEADER: \usepackage{algpseudocode}
 #+LATEX_HEADER: \usepackage{xcolor}
 #+LATEX_HEADER: \usepackage{listings}
-#+LATEX_HEADER: \lstset{basicstyle=\footnotesize\ttfamily, frame=single, breaklines=true, numbers=left, numberstyle=\tiny\color{gray}, language=C}
+#+LATEX_HEADER: \lstset{basicstyle=\footnotesize\ttfamily, frame=single, breaklines=true, numbers=left, numberstyle=\tiny\color{gray}, language=C, inputencoding=utf8, extendedchars=true}
 
 # PDF generation can be done by make (thanks Luka Stanisic)
 #   or C-c C-e l p (thanks Vinicius Garcia)
@@ -196,7 +196,7 @@ críticas sobre os valores de $Q$.
 
 #+CAPTION: Implementação HOGWILD! em OpenMP (train_hogwild)
 #+begin_export latex
-\begin{lstlisting}
+\begin{lstlisting}[float=h]
 #pragma omp parallel private(episode)
 {
     int tid = omp_get_thread_num();
@@ -208,7 +208,7 @@ críticas sobre os valores de $Q$.
 
     #pragma omp for schedule(runtime)
     for (episode = 0; episode < cfg->num_episodes; episode++)
-        run_episode(&local_ql, episode); /* lê/escreve shared sem lock */
+        run_episode(&local_ql, episode); /* le/escreve shared sem lock */
 }
 \end{lstlisting}
 #+end_export
@@ -278,16 +278,16 @@ ggplot(agg, aes(x=threads, y=speedup, color=sync_mode, shape=sync_mode)) +
 #+RESULTS:
 [[file:speedup_blocks.pdf]]
 
-** Conclusion
+** Conclusão
 
-** Acknowledgments
+** Agradecimentos
 :PROPERTIES:
 :UNNUMBERED: t
 :END:
 
 Who paid for this?
 
-** References                                                        :ignore:
+** Referenrências                                                   :ignore:
 
 # See next section to understand how refs.bib file is created.
 bibliographystyle:sbc.bst
@@ -297,30 +297,6 @@ bibliographystyle:sbc.bst
 
 Tangle this file with C-c C-v t
 #+begin_src bibtex :tangle refs.bib
-@article{orgmode,
-  author =	"Eric Schulte and Dan Davison and Thomas Dye and Carsten Dominik",
-  title =	"A Multi-Language Computing Environment for Literate Programming and Reproducible Research",
-  journal =	"J. of Stat. Soft.",
-  volume =	"46",
-  number =	"3",
-  day =  	"25",
-  year = 	"2012",
-  CODEN =	"JSSOBK",
-  ISSN = 	"1548-7660",
-  bibdate =	"2011-10-03",
-  accepted =	"2011-10-03",
-  acknowledgement = "",
-  submitted =	"2010-12-22",
-}
-
-@incollection{schnorr2013visualizing,
-  title={Visualizing More Performance Data Than What Fits on Your Screen},
-  author={Schnorr, Lucas M and Legrand, Arnaud},
-  booktitle={Tools for High Performance Computing 2012},
-  pages={149--162},
-  year={2013},
-  publisher={Springer}
-}
 
 @inproceedings{niu2011hogwild,
   title={Hogwild!: A lock-free approach to parallelizing stochastic gradient descent},
